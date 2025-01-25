@@ -80,8 +80,12 @@ class Saige:
             self.chat_bot.set_system_prompt(first_challenge['system_prompt'])
         
         # Initialize Straiker
+        straiker_api_key = os.getenv('STRAIKER_API_KEY')
+        if not straiker_api_key:
+            raise ValueError("STRAIKER_API_KEY environment variable is not set")
+            
         self.straiker = Straiker(
-            api_key="d5002ba1-a7cb-4f5a-a188-369e5716e5c3",
+            api_key=straiker_api_key,
             user_name="saige@straiker.ai",
             debug=True
         )
@@ -312,7 +316,7 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
         
         # Update Straiker with user info
         self.straiker = Straiker(
-            api_key="d5002ba1-a7cb-4f5a-a188-369e5716e5c3",
+            api_key=os.getenv('STRAIKER_API_KEY'),
             user_name=email,
             debug=True
         )
