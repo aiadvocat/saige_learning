@@ -32,12 +32,21 @@ An interactive educational tool for learning about AI security through hands-on 
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Set up environment variables:
+   ```bash
+   # On Unix/macOS:
+   export STRAIKER_API_KEY='your-api-key-here'
+   
+   # On Windows:
+   set STRAIKER_API_KEY=your-api-key-here
+   ```
+
+4. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Start Ollama and pull required models:
+5. Start Ollama and pull required models:
    ```bash
    ollama pull llama3
    ollama pull mistral
@@ -97,3 +106,20 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Ollama team for providing local LLM capabilities
 - Straiker SDK for security analysis features
 - Langchain for LLM interaction framework
+
+## Environment Variables
+
+The application requires the following environment variables to be set:
+
+| Variable | Description |
+|----------|-------------|
+| STRAIKER_API_KEY | API key for Straiker SDK security analysis |
+
+You can set these permanently in your shell profile or use a `.env` file:
+
+```bash
+# .env file example
+STRAIKER_API_KEY=your-api-key-here
+```
+
+Note: Never commit your `.env` file or actual API keys to version control.
