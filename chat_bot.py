@@ -45,7 +45,7 @@ class ChatBot:
         # Initialize Ollama LLM with llama3 and streaming
         self.llm = OllamaLLM(
             model="llama3", 
-            temperature=0.7,
+            temperature=0.1,
             streaming=True,
             callbacks=[ColorStreamingCallbackHandler(self.BLUE)]
         )

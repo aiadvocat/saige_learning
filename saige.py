@@ -82,7 +82,23 @@ class Saige:
         # Initialize Straiker
         straiker_api_key = os.getenv('STRAIKER_API_KEY')
         if not straiker_api_key:
-            raise ValueError("STRAIKER_API_KEY environment variable is not set")
+            print(f"""
+{self.HOTPINK}Error: STRAIKER_API_KEY environment variable is not set{self.RESET}
+
+Please set the STRAIKER_API_KEY environment variable:
+
+On Unix/macOS:
+    export STRAIKER_API_KEY='your-api-key-here'
+
+On Windows:
+    set STRAIKER_API_KEY=your-api-key-here
+
+Or create a .env file with:
+    STRAIKER_API_KEY=your-api-key-here
+
+You can get an API key from: https://straiker.ai/
+""")
+            sys.exit(1)
             
         self.straiker = Straiker(
             api_key=straiker_api_key,
@@ -267,6 +283,13 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
         if not self.user_email:
             return
             
+        # If all challenges are completed, delete progress file to start fresh next time
+        if self.current_chapter >= len(self.guide["chapters"]):
+            progress_file = self._get_progress_file()
+            if progress_file and progress_file.exists():
+                progress_file.unlink()
+            return
+            
         progress = {
             "email": self.user_email,
             "name": self.user_name,
@@ -328,6 +351,19 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
 
     def introduce_current_state(self) -> str:
         """Get introduction for current chapter and challenge"""
+        # Check if all chapters are completed
+        if self.current_chapter >= len(self.guide["chapters"]):
+            # Reset to beginning
+            self.current_chapter = 0
+            self.current_challenge = 0
+            self.current_hint = 0
+            self.attempt_count = 0
+            return "Welcome back! Starting fresh with Chapter 1.\n\n" + self._get_current_intro()
+            
+        return self._get_current_intro()
+        
+    def _get_current_intro(self) -> str:
+        """Helper to get current chapter/challenge intro"""
         chapter = self.guide["chapters"][self.current_chapter]
         challenge = self.get_current_challenge()
         
