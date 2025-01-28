@@ -2,14 +2,17 @@
 
 An interactive educational tool for learning about AI security through hands-on challenges. Users interact with an AI Professor while being guided by Saige, an AI security mentor.
 
+![Saige Web Interface](saigeweb.png)
+
 ## Features
 
 - Interactive chat-based learning environment
+- Modern web interface with terminal emulation
 - Progressive security challenges
 - Real-time security analysis with Straiker SDK
 - Progress tracking and persistence
 - Streaming AI responses
-- Colorized terminal output
+- Colorized output
 - Save and resume functionality
 
 ## Prerequisites
@@ -54,10 +57,18 @@ An interactive educational tool for learning about AI security through hands-on 
 
 ## Usage
 
-Run the application:
+Start the application:
 ```bash
-python orchestrator.py
+python main.py  # For terminal interface
 ```
+
+Or start the web interface with an optional port (default is 5000):
+```bash
+python main.py --web  # Uses default port 5000
+python main.py --web 8080  # Uses port 8080
+```
+
+Then open your browser to the appropriate URL (e.g., `http://localhost:5000` or `http://localhost:8080`) to access the web interface.
 
 Follow the prompts to:
 1. Enter your name and email
@@ -72,19 +83,24 @@ Your progress is automatically saved and can be resumed by using the same email 
 
 ## Project Structure
 
-- `orchestrator.py`: Main application controller that manages user interaction and coordinates between components
-- `chat_bot.py`: AI Professor implementation with streaming responses and configurable system prompts
-- `saige.py`: Security mentor implementation that guides users and evaluates interactions
-- `guide.json`: Challenge configuration including prompts, success criteria, and rewards
-- `progress/`: Directory containing saved user progress (automatically created)
+- `web_app.py`: Flask web application that serves the web interface
+- `templates/`: HTML templates for the web interface
+- `static/`: Static assets including CSS and JavaScript
+- `orchestrator.py`: Main application controller that manages user interaction
+- `chat_bot.py`: AI Professor implementation with streaming responses
+- `saige.py`: Security mentor implementation that guides users
+- `guide.json`: Challenge configuration including prompts and success criteria
+- `progress/`: Directory containing saved user progress
 
 ## Technical Details
 
+- Flask web application with WebSocket support for real-time communication
+- Terminal emulation using Xterm.js for authentic terminal experience
 - Uses Langchain for LLM interactions
 - Implements streaming responses for natural conversation flow
 - Integrates with Straiker SDK for security analysis
 - Maintains conversation history for context
-- Supports ANSI color formatting for terminal output
+- Supports ANSI color formatting for both web and terminal output
 - Implements save/load functionality for progress persistence
 
 ## Contributing
