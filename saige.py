@@ -72,6 +72,10 @@ class Saige:
         with open('guide.json', 'r') as f:
             self.guide = json.load(f)
             
+        # Set the title from guide.json
+        if 'title' in self.guide:
+            self.io.set_title(self.guide['title'])
+            
         # Initialize state
         self.current_chapter = 0
         self.current_challenge = 0

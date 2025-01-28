@@ -17,6 +17,11 @@ class IOHandler(ABC):
         """Clear the display"""
         pass
 
+    @abstractmethod
+    def set_title(self, title: str):
+        """Set the display title"""
+        pass
+
 class TerminalIO(IOHandler):
     def output(self, text: str, style: str = None, end: str = "\n"):
         if style:
@@ -30,6 +35,10 @@ class TerminalIO(IOHandler):
     
     def clear(self):
         print("\033[2J\033[H")
+
+    def set_title(self, title: str):
+        # For terminal, we can use ANSI escape sequence to set terminal title
+        print(f"\033]0;{title}\007", end="")
 
 class WebIO(IOHandler):
     # ANSI color mapping to CSS classes
@@ -128,4 +137,12 @@ class WebIO(IOHandler):
 
     def clear(self):
         if self.socketio:
-            self.socketio.emit('clear') 
+            self.socketio.emit('clear')
+
+    def set_title(self, title: str):
+        """Update the title in the web interface"""
+        if self.socketio and self.current_session:
+            self.socketio.emit('update_title', 
+                             {'title': title}, 
+                             room=self.current_session, 
+                             namespace='/terminal') 

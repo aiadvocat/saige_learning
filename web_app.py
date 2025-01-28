@@ -21,7 +21,12 @@ def index():
     if not game_id:
         game_id = secrets.token_hex(8)
         session['game_id'] = game_id
-    return render_template('terminal.html', game_id=game_id)
+    return render_template('terminal.html', game_id=game_id, title='AI Security Challenge')
+
+def update_title(game_id: str, title: str):
+    """Update the title for a specific game session"""
+    if game_id in active_games:
+        socketio.emit('update_title', {'title': title}, room=game_id, namespace='/terminal')
 
 @socketio.on('connect', namespace='/terminal')
 def handle_connect():

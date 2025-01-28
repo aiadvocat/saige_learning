@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AI Security Challenge</title>
+    <title>{{ title|default('AI Security Challenge') }}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script>
         const sessionId = "{{ game_id }}";
@@ -17,6 +17,16 @@
             box-sizing: border-box;
         }
         
+        #title-container {
+            color: #00ff00;
+            font-family: 'Fira Code', monospace;
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #00ff00;
+            text-shadow: 0 0 10px rgba(0,255,0,0.5);
+        }
+        
         #terminal-container {
             flex-grow: 1;
             background: rgba(0,0,0,0.9);
@@ -25,6 +35,7 @@
             box-shadow: 0 0 20px rgba(0,255,0,0.2);
             padding: 5px;
             overflow: hidden;
+            height: calc(100vh - 80px); /* Adjust for title height */
         }
 
         .xterm-viewport::-webkit-scrollbar {
@@ -42,6 +53,9 @@
     </style>
 </head>
 <body>
+    <div id="title-container">
+        <h1>{{ title|default('AI Security Challenge') }}</h1>
+    </div>
     <div id="terminal-container"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -201,6 +215,19 @@
         socket.on('game_ended', () => {
             isProcessing = false;
             term.write('\r\n\x1b[31mGame session ended. Please refresh to start a new game.\x1b[0m\r\n');
+        });
+
+        // Add function to update title dynamically
+        function updateTitle(newTitle) {
+            document.title = newTitle;
+            document.querySelector('#title-container h1').textContent = newTitle;
+        }
+
+        // Add socket listener for title updates
+        socket.on('update_title', data => {
+            if (data.title) {
+                updateTitle(data.title);
+            }
         });
     </script>
 </body>
