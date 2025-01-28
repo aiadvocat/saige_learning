@@ -2,15 +2,17 @@ from chat_bot import ChatBot
 from saige import Saige
 import sys
 import re
+from io_handler import IOHandler
 
 class Orchestrator:
     # ANSI color codes
     GREEN = "\033[32m"
     RESET = "\033[0m"
 
-    def __init__(self):
-        self.chat_bot = ChatBot()
-        self.saige = Saige(self.chat_bot)
+    def __init__(self, io_handler: IOHandler):
+        self.io = io_handler
+        self.chat_bot = ChatBot(io_handler)
+        self.saige = Saige(self.chat_bot, io_handler)
         self.user_name = None
         self.user_email = None
         self.prompt_prefix = "You"
@@ -22,37 +24,40 @@ class Orchestrator:
 
     def _get_user_info(self):
         """Get and validate user information"""
-        print("\nBefore we begin, let me get to know you better!")
+        self.io.output("\nBefore we begin, let me get to know you better!")
         
         # Get name
         while not self.user_name:
-            name = input("What's your name? ").strip()
+            name = self.io.input("What's your name? ").strip()
             if name and len(name) >= 2:
                 self.user_name = name
-                self.prompt_prefix = name  # Set the prompt prefix to user's name
+                self.prompt_prefix = name
             else:
-                print("Please enter a valid name (at least 2 characters).")
+                self.io.output("Please enter a valid name (at least 2 characters).")
 
         # Get email
         while not self.user_email:
-            email = input("What's your email? ").strip()
-            if self._validate_email(email):
-                self.user_email = email
-            else:
-                print("Please enter a valid email address.")
+            try:
+                email = self.io.input("What's your email? ").strip()
+                if self._validate_email(email):
+                    self.user_email = email
+                else:
+                    self.io.output("Please enter a valid email address.")
+            except Exception as e:
+                print(f"DEBUG: Exception in email input: {str(e)}")
+                raise
+
 
         # Update Saige with user info and check for existing progress
         welcome_back = self.saige.set_user_info(self.user_name, self.user_email)
         if welcome_back:
-            self.saige.display_message(welcome_back)
+            self.io.output(welcome_back)
 
     def run(self):
         """Main interaction loop"""
-        # Display welcome message
-        print("\nWelcome to the AI Security Challenge!")
-        print("Chat with the AI Professor while 'Saige' our AI Guardian guides you through security challenges.")
-        
-        print("Type 'exit' to quit, 'hint' for help.\n")
+        self.io.output("\nWelcome to the AI Security Challenge!")
+        self.io.output("Chat with the AI Professor while 'Saige' our AI Guardian guides you through security challenges.")
+        self.io.output("Type 'exit' to quit, 'hint' for help.\n")
 
         # Get user info before starting
         self._get_user_info()
@@ -64,18 +69,19 @@ class Orchestrator:
         while True:
             try:
                 # Get user input with personalized prompt in green
-                user_input = input(f"\n{self.GREEN}{self.prompt_prefix}:{self.RESET} ").strip()
+                user_input = self.io.input(f"\n{self.GREEN}{self.prompt_prefix}:{self.RESET} ").strip()
                 
                 if user_input.lower() in ['exit', 'quit', 'bye']:
                     # Save progress before exiting
                     self.saige.save_progress()
-                    print("\nProgress saved! Goodbye! Thanks for learning about AI security!")
+                    self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
                     break
                     
                 if user_input.lower() == 'hint':
                     hint = self.saige.get_next_hint()
                     if hint:
-                        self.saige.display_message(hint)
+                        display_hint = f"\n💡 {hint}"
+                        self.saige.display_message(display_hint)
                     continue
 
                 # Get response from chat bot
@@ -85,7 +91,7 @@ class Orchestrator:
                 # Let Saige evaluate the interaction
                 success, feedback = self.saige.evaluate_interaction(user_input, response)
                 if feedback:
-                    self.saige.display_message(feedback)
+                    #self.saige.display_message(feedback)
                     if success:
                         # If successful, advance to next challenge and show intro
                         next_intro = self.saige.advance_challenge()
@@ -98,13 +104,14 @@ class Orchestrator:
             except KeyboardInterrupt:
                 # Save progress before exiting
                 self.saige.save_progress()
-                print("\nProgress saved! Goodbye! Thanks for learning about AI security!")
+                self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
                 break
             except Exception as e:
-                print(f"An error occurred: {e}")
+                self.io.output(f"An error occurred: {e}")
 
 def main():
-    orchestrator = Orchestrator()
+    io_handler = IOHandler()
+    orchestrator = Orchestrator(io_handler)
     orchestrator.run()
 
 if __name__ == "__main__":

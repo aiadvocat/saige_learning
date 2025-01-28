@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Security Challenge</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script>
+        const sessionId = "{{ game_id }}";
+    </script>
+    <style>
+        body {
+            background: #0a0a0a;
+            margin: 0;
+            padding: 10px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        
+        #terminal-container {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0,255,0,0.2);
+            padding: 5px;
+            overflow: hidden;
+        }
+
+        .xterm-viewport::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: #00ff00;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal-container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        
+        const socket = io('/terminal', {
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            query: { session: sessionId }
+        });
+        
+        // Socket connection handling
+        socket.on('connect', () => {
+            socket.emit('register', { session: sessionId });
+        });
+        
+        socket.on('disconnect', () => {
+            isProcessing = false;
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('DEBUG Socket: Connection error:', error);
+        });
+        
+        socket.on('heartbeat', () => {
+            try {
+                socket.emit('heartbeat_response', { session: sessionId });
+            } catch (e) {
+                console.log('DEBUG Socket: Error sending heartbeat response:', e);
+            }
+        });
+        
+        socket.on('error', (error) => {
+            console.log('DEBUG Socket: Error:', error);
+        });
+        
+        socket.on('connect_timeout', () => {
+            console.log('DEBUG Socket: Connection timeout');
+        });
+        
+        const term = new Terminal({
+            cursorBlink: true,
+            theme: {
+                background: '#000000',
+                foreground: '#00ff00',
+                cursor: '#00ff00'
+            },
+            fontFamily: 'Fira Code, monospace',
+            fontSize: 14,
+            convertEol: true,
+            scrollback: 1000
+        });
+        
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        
+        function fitTerminal() {
+            try {
+                fitAddon.fit();
+                console.log('DEBUG: Terminal resized to', term.cols, 'x', term.rows);
+            } catch (e) {
+                console.error('DEBUG: Error fitting terminal:', e);
+            }
+        }
+
+        term.open(document.getElementById('terminal-container'));
+        fitTerminal();
+
+        window.addEventListener('resize', () => {
+            setTimeout(fitTerminal, 100);
+        });
+
+        window.addEventListener('orientationchange', () => {
+            setTimeout(fitTerminal, 100);
+        });
+        
+        let currentInput = '';
+        let isProcessing = false;
+        
+        // Handle terminal input
+        term.onData(e => {
+            if (isProcessing) {
+                console.log('DEBUG Socket: Ignoring input - processing');
+                return;
+            }
+            
+            if (e === '\r') { // Enter key
+                if (currentInput.trim()) {
+                    try {
+                        socket.emit('input', {
+                            text: currentInput,
+                            session: sessionId
+                        });
+                        isProcessing = true;
+                        term.write('\r\n');
+                        currentInput = '';
+                    } catch (e) {
+                        isProcessing = false;
+                    }
+                }
+            } else if (e === '\u007F') { // Backspace
+                if (currentInput.length > 0) {
+                    currentInput = currentInput.slice(0, -1);
+                    term.write('\b \b');
+                    console.log('DEBUG: Backspace, current input:', currentInput);
+                }
+            } else if (e >= ' ' && e <= '~') { // Printable characters
+                currentInput += e;
+                term.write(e);
+                console.log('DEBUG: Updated input:', currentInput);
+            }
+        });
+        
+        // Handle server output
+        socket.on('output', data => {
+            try {
+                
+                if (!socket.connected) {
+                    socket.connect();
+                    return;
+                }
+                
+                if (data.session && data.session !== sessionId) {
+                    return;
+                }
+                
+                if (data.text) {
+                    
+                    if (data.is_prompt) {
+                        // Handle prompts
+                        term.write('\r');
+                        term.write(data.text);
+                    } else if (data.is_streaming) {
+                        // Handle streaming output without newlines
+                        term.write(data.text);
+                    } else {
+                        // Handle normal output
+                        term.write(data.text);
+                        if (data.end === '\n') {
+                            term.write('\r\n');
+                        }
+                    }
+                }
+                isProcessing = false;
+            } catch (e) {
+                console.error('DEBUG Socket: Error handling output:', e);
+            }
+        });
+        
+        socket.on('clear', () => {
+            term.clear();
+        });
+
+        socket.on('game_ended', () => {
+            isProcessing = false;
+            term.write('\r\n\x1b[31mGame session ended. Please refresh to start a new game.\x1b[0m\r\n');
+        });
+    </script>
+</body>
+</html> 

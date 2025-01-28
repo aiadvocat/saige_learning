@@ -10,28 +10,33 @@ import hashlib
 from datetime import date
 import os
 from pathlib import Path
+from io_handler import IOHandler
 
 class ColorStreamingCallbackHandler(StreamingStdOutCallbackHandler):
     """Custom streaming handler with color support"""
-    def __init__(self, color: str, prefix: str):
+    def __init__(self, color: str, prefix: str, io_handler: IOHandler):
         super().__init__()
         self.color = color
         self.prefix = prefix
-        # Print prefix only once at start
-        print(f"{self.color}{self.prefix}{self.RESET}", end="")
-        sys.stdout.flush()
+        self.io = io_handler
+        self.first_token = True
 
     # ANSI color codes
     RESET = "\033[0m"
 
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Stream tokens with color"""
-        print(f"{self.color}{token}{self.RESET}", end="")
-        sys.stdout.flush()
+        # Print prefix at start using io handler
+        if self.first_token:
+            # Print prefix before first token of response
+            self.io.output(f"{self.color}\nSaige:{self.RESET} ", end="")
+            self.first_token = False
+        self.io.output(f"{self.color}{token}{self.RESET}", end="")
 
     def on_llm_end(self, *args, **kwargs) -> None:
         """Add newline at end"""
-        print()
+        self.io.output("\n", end="")
+        self.first_token = True
 
 class ChatHistory(BaseChatMessageHistory):
     def __init__(self):
@@ -50,12 +55,15 @@ class Saige:
     HOTPINK = "\033[38;5;205m"
     RESET = "\033[0m"
 
-    def __init__(self, chat_bot):
-        # Initialize Ollama LLM with a more capable model for analysis
-        self.llm = OllamaLLM(model="mistral", temperature=0.3)
-        
-        # Store reference to ChatBot
+    def __init__(self, chat_bot, io_handler: IOHandler):
+        self.io = io_handler
         self.chat_bot = chat_bot
+        # Initialize Ollama LLM with a more capable model for analysis
+        self.llm = OllamaLLM(
+            model="llama3.1", 
+            temperature=0.3,
+            callbacks=[ColorStreamingCallbackHandler(self.HOTPINK, "Saige:", io_handler)]
+        )
         
         # Initialize chat history
         self.history = ChatHistory()
@@ -82,7 +90,7 @@ class Saige:
         # Initialize Straiker
         straiker_api_key = os.getenv('STRAIKER_API_KEY')
         if not straiker_api_key:
-            print(f"""
+            self.io.output(f"""
 {self.HOTPINK}Error: STRAIKER_API_KEY environment variable is not set{self.RESET}
 
 Please set the STRAIKER_API_KEY environment variable:
@@ -113,17 +121,17 @@ You can get an API key from: https://straiker.ai/
         # Set initial system prompt
         self._initialize_system_prompt()
         # Add Saige's face ASCII art
-        saige_face = """
+        saige_face = r"""
           .-''''-.
         .'        '.  ..I'm Saige..
-       /    |  |    \\
+       /    |  |    \
       |     |  |     |
       |              |
-       \\            /
+       \            /
         '.        .'
           '------'
         """
-        print(f"{self.HOTPINK}{saige_face}{self.RESET}")        
+        self.io.output(f"{self.HOTPINK}{saige_face}{self.RESET}")        
 
     def _initialize_system_prompt(self):
         system_prompt = """You are Saige, an AI guide specializing in AI security education.
@@ -151,7 +159,7 @@ You can get an API key from: https://straiker.ai/
         current_challenge = self.get_current_challenge()
         if not current_challenge:
             return True, "🎉 Amazing work! You've completed all challenges in all chapters! Type 'exit' to end the session."
-        
+        self.display_message("\n🤔 Evaluating interaction... ⏳")
         security_warning = None
         # Check security with Straiker
         try:
@@ -170,9 +178,12 @@ You can get an API key from: https://straiker.ai/
 
         # Add interaction to history and evaluate
         evaluation_prompt = self._create_evaluation_prompt(user_input, bot_response, current_challenge)
-        self.history.add_message(HumanMessage(content=evaluation_prompt))
-        
-        evaluation = self.llm.invoke(self.history.messages)
+
+        # comment out for now. I don't think this is working evaluating the entire history
+        #self.history.add_message(HumanMessage(content=evaluation_prompt))        
+        #evaluation = self.llm.invoke(self.history.messages)
+        evaluation = self.llm.invoke(evaluation_prompt)
+
         self.history.add_message(AIMessage(content=evaluation))
         
         success, feedback = self._parse_evaluation(evaluation.strip())
@@ -200,12 +211,12 @@ You can get an API key from: https://straiker.ai/
 
     def display_message(self, message: str):
         """Display a message with appropriate formatting"""
-        print(f"{self.HOTPINK}Saige:{self.RESET} {message}")
+        self.io.output(f"{self.HOTPINK}\nSaige:{self.RESET} {message}")
 
     def _create_evaluation_prompt(self, user_input: str, bot_response: str, challenge: Dict) -> str:
         """Create a prompt to evaluate the interaction against challenge criteria"""
         return f"""
-Please evaluate this interaction with the AI Professor:
+Please evaluate this interaction with the AI Professor with particular attention to the success criteria and the beginning of the Professor's response:
 
 User: {user_input}
 Professor: {bot_response}
@@ -216,10 +227,10 @@ Description: {challenge['description']}
 Success Criteria:
 {json.dumps(challenge['success_criteria']['requirements'], indent=2)}
 
-Evaluate if the interaction meets the success criteria. Respond with:
-SUCCESS: <reason> - if all criteria are met
-CONTINUE: <feedback> - if the user should keep trying
-HINT: <next hint> - if the user needs help
+Evaluate if the interaction between the User: and the Professor: meets the success criteria. Respond with only one of the following:
+HINT 💡: <helpful hint about the Success Criteria:> - if the user needs help or the Professor's response showed they were confused, uncertain or they mention a misunderstanding
+SUCCESS ✅: <reason> - if all of the criteria are met. Be strict about the criteria.
+CONTINUE ❌: <feedback> - if the user should keep trying because they didn't meet all of the criteria.
 
 Keep your response concise and focused on the evaluation.
 """
@@ -228,15 +239,15 @@ Keep your response concise and focused on the evaluation.
         """Parse the evaluation response to determine success and feedback"""
         evaluation = evaluation.strip().upper()
         
-        if evaluation.startswith("SUCCESS:"):
+        if evaluation.startswith("SUCCESS"):
             self.attempt_count = 0  # Reset attempts on success
             return True, evaluation[8:].strip()
         
-        if evaluation.startswith("HINT:"):
+        if evaluation.startswith("HINT"):
             self.attempt_count += 1
             return False, evaluation[5:].strip()
         
-        if evaluation.startswith("CONTINUE:"):
+        if evaluation.startswith("CONTINUE"):
             self.attempt_count += 1
             return False, evaluation[9:].strip()
         
@@ -255,6 +266,7 @@ As an AI security educator, provide a brief security lesson for each of these de
 For each detection, explain in a fun way in a simple paragraph, why this is a security concern, how it could be exploited, and a better approach.
 
 Keep each lesson concise and educational.
+Start the entire response with the string "🚨 Security Alert 🚨"
 After all of the lessons, end the response with a fun and slightly sarcastic comment about the users deviation from the lessons.
 """
         
@@ -329,7 +341,7 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
                 
             return True
         except Exception as e:
-            print(f"Error loading progress: {e}")
+            self.io.output(f"Error loading progress: {e}")
             return False
 
     def set_user_info(self, name: str, email: str):

@@ -4,6 +4,7 @@ from langchain_core.chat_history import BaseChatMessageHistory
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import sys
 from typing import Optional, List
+from io_handler import IOHandler
 
 class ChatHistory(BaseChatMessageHistory):
     def __init__(self):
@@ -17,43 +18,44 @@ class ChatHistory(BaseChatMessageHistory):
 
 class ColorStreamingCallbackHandler(StreamingStdOutCallbackHandler):
     """Custom streaming handler with color support"""
-    def __init__(self, color: str):
+    def __init__(self, color: str, io_handler: IOHandler):
         super().__init__()
         self.color = color
-        sys.stdout.flush()
+        self.io = io_handler
+        self.first_token = True
 
     # ANSI color codes
     RESET = "\033[0m"
 
     def on_llm_new_token(self, token: str, **kwargs) -> None:
-        """Stream tokens without color"""
-        print(token, end="")
-        sys.stdout.flush()
+        """Stream tokens with color"""
+        if self.first_token:
+            # Print prefix before first token of response
+            self.io.output(f"{self.color}\nProfessor:{self.RESET} ", end="")
+            self.first_token = False
+        self.io.output(f"{self.color}{token}{self.RESET}", end="")
 
     def on_llm_end(self, *args, **kwargs) -> None:
-        """Add newline at end"""
-        print()
+        """Add newline at end and reset first_token flag"""
+        self.io.output("\n", end="")  # Explicitly add newline at end
+        self.first_token = True  # Reset for next response
 
 class ChatBot:
     """Primary chat bot with configurable system prompt"""
     
     # ANSI color codes
-    BLUE = "\033[34m"
+    BLUE = "\033[96m"
     RESET = "\033[0m"
 
-    def __init__(self):
-        # Initialize Ollama LLM with llama3 and streaming
+    def __init__(self, io_handler: IOHandler):
+        self.io = io_handler
         self.llm = OllamaLLM(
             model="llama3", 
             temperature=0.1,
             streaming=True,
-            callbacks=[ColorStreamingCallbackHandler(self.BLUE)]
+            callbacks=[ColorStreamingCallbackHandler(self.BLUE, io_handler)]
         )
-        
-        # Initialize chat history
         self.history = ChatHistory()
-        
-        # Set default system prompt
         self._initialize_system_prompt()
 
     def _initialize_system_prompt(self):
@@ -75,9 +77,6 @@ class ChatBot:
         try:
             # Add user message to history
             self.history.add_message(HumanMessage(content=user_input))
-
-            # Print colored prefix 
-            print(f"{self.BLUE}Professor:{self.RESET} ", end="")
             
             # Get response from LLM with full conversation history
             response = self.llm.invoke(self.history.messages)
@@ -91,8 +90,7 @@ class ChatBot:
 
     def display_message(self, message: str, is_user: bool = False):
         """Display a message with appropriate formatting"""
-        # Only handle user messages since bot responses are streamed
         if is_user:
-            print(f"You: {message}")
+            self.io.output(f"You: {message}")
         else:
-            print(f"{self.BLUE}Professor:{self.RESET} {message}") 
+            self.io.output(f"{self.BLUE}Professor:{self.RESET} {message}") 
