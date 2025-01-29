@@ -2,7 +2,7 @@
 
 An interactive educational tool for learning about AI security through hands-on challenges. Users interact with an AI Professor while being guided by Saige, an AI security mentor.
 
-![Saige Web Interface](saigeweb.png)
+![Saige Web Interface](saige.gif)
 
 ## Features
 

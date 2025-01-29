@@ -3,6 +3,7 @@ from saige import Saige
 import sys
 import re
 from io_handler import IOHandler
+from input_sanitizer import InputSanitizer
 
 class Orchestrator:
     # ANSI color codes
@@ -16,6 +17,7 @@ class Orchestrator:
         self.user_name = None
         self.user_email = None
         self.prompt_prefix = "You"
+        self.sanitizer = InputSanitizer()
 
     def _validate_email(self, email: str) -> bool:
         """Simple email validation"""
@@ -28,25 +30,26 @@ class Orchestrator:
         
         # Get name
         while not self.user_name:
-            name = self.io.input("What's your name? ").strip()
-            if name and len(name) >= 2:
-                self.user_name = name
-                self.prompt_prefix = name
+            name = self.io.input("What's your name? ")
+            sanitized_name = self.sanitizer.sanitize_name(name)
+            if sanitized_name:
+                self.user_name = sanitized_name
+                self.prompt_prefix = sanitized_name
             else:
-                self.io.output("Please enter a valid name (at least 2 characters).")
+                self.io.output("Please enter a valid name (letters, numbers, spaces, hyphens, and apostrophes only).")
 
         # Get email
         while not self.user_email:
             try:
-                email = self.io.input("What's your email? ").strip()
-                if self._validate_email(email):
-                    self.user_email = email
+                email = self.io.input("What's your email? ")
+                sanitized_email = self.sanitizer.sanitize_email(email)
+                if sanitized_email:
+                    self.user_email = sanitized_email
                 else:
                     self.io.output("Please enter a valid email address.")
             except Exception as e:
                 print(f"DEBUG: Exception in email input: {str(e)}")
                 raise
-
 
         # Update Saige with user info and check for existing progress
         welcome_back = self.saige.set_user_info(self.user_name, self.user_email)
@@ -55,12 +58,40 @@ class Orchestrator:
 
     def run(self):
         """Main interaction loop"""
-        self.io.output("\nWelcome to the AI Security Challenge!")
-        self.io.output("Chat with the AI Professor while 'Saige' our AI Guardian guides you through security challenges.")
-        self.io.output("Type 'exit' to quit, 'hint' for help.\n")
+        self.io.output(f"\nWelcome to the AI Security Challenge!")
+        self.io.output("""
+In this adventure, you'll be interacting with two unique characters:
+
+🎓  The Professor - An AI Professor who loves Hitchhiker's Guide to the Galaxy
+   (or so they say... maybe you can change their mind?)
+
+🛡️  Saige - Your AI security mentor and guide through this journey
+   They'll evaluate your interactions and teach you about AI security risks
+
+👤  You - The participant, learning to both hack and defend AI systems
+   Sometimes you'll be asked to be good, sometimes... not so much!
+
+You'll progress through multiple chapters, each containing unique challenges.
+Some will test your ability to keep AI systems within their bounds,
+others will challenge you to make them break those very same bounds!
+
+Saige will analyze your interactions for both successes and security concerns.
+Yes, sometimes we'll ask you to trigger those security alerts - that's how we learn!
+
+Throughout the journey:
+- Type 'hint' if you need help with a challenge
+- Type 'learn' if you think Saige's evaluation was incorrect
+- Type 'exit' to save your progress (based on your name and email) and quit\n""")
 
         # Get user info before starting
         self._get_user_info()
+
+        # Clear screen for fresh start with challenges
+        self.io.clear()
+        
+        # Show welcome banner again
+        self.io.output("\nThanks for your details! Let's get started!")
+        self.io.output("Type 'exit' to quit, 'hint' for help, 'learn' to report incorrect evaluation.\n")
 
         # Introduce first challenge
         intro = self.saige.introduce_current_state()
@@ -84,14 +115,17 @@ class Orchestrator:
                         self.saige.display_message(display_hint)
                     continue
 
+                if user_input.lower() == 'learn':
+                    feedback = self.saige.save_learning_feedback()
+                    self.saige.display_message(feedback)
+                    continue
+
                 # Get response from chat bot
                 response = self.chat_bot.chat(user_input)
-                #self.chat_bot.display_message(response)
 
                 # Let Saige evaluate the interaction
                 success, feedback = self.saige.evaluate_interaction(user_input, response)
                 if feedback:
-                    #self.saige.display_message(feedback)
                     if success:
                         # If successful, advance to next challenge and show intro
                         next_intro = self.saige.advance_challenge()

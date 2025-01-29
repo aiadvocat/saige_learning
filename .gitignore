@@ -35,5 +35,6 @@ env/
 
 # Project specific
 progress/
+learnings/
 *.log
 .DS_Store 

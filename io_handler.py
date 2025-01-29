@@ -118,17 +118,14 @@ class WebIO(IOHandler):
         if not session_id:
             raise RuntimeError("No active session")
             
-        print(f"Waiting for input on session {session_id}")
         # Send prompt to client
         self.output(prompt, end="")
         
         try:
             # Wait up to 120 seconds for input
             result = self.input_queue.get(timeout=120)  # Use input_queue directly
-            print(f"Received input on session {session_id}: {result}")
             return result
         except Empty:
-            print(f"Timeout waiting for input on session {session_id}")
             raise RuntimeError("Input timeout - no response received")
 
     def set_session(self, session_id):
@@ -137,7 +134,7 @@ class WebIO(IOHandler):
 
     def clear(self):
         if self.socketio:
-            self.socketio.emit('clear')
+            self.socketio.emit('clear', room=self.current_session, namespace='/terminal')
 
     def set_title(self, title: str):
         """Update the title in the web interface"""

@@ -7,7 +7,7 @@ import sys
 import json
 from typing import Dict, Optional, Tuple, List
 import hashlib
-from datetime import date
+from datetime import date, datetime
 import os
 from pathlib import Path
 from io_handler import IOHandler
@@ -82,14 +82,19 @@ class Saige:
         self.current_hint = 0
         self.attempt_count = 0
         
-        # Create progress directory if it doesn't exist
+        # Set initial system prompt from first challenge
+        initial_challenge = self.get_current_challenge()
+        if initial_challenge and 'system_prompt' in initial_challenge:
+            self.chat_bot.set_system_prompt(initial_challenge['system_prompt'])
+        
+        # Create progress and learnings directories if they don't exist
         self.progress_dir = Path("progress")
         self.progress_dir.mkdir(exist_ok=True)
+        self.learnings_dir = Path("learnings")
+        self.learnings_dir.mkdir(exist_ok=True)
         
-        # Set initial ChatBot system prompt from first challenge
-        first_challenge = self.get_current_challenge()
-        if first_challenge and 'system_prompt' in first_challenge:
-            self.chat_bot.set_system_prompt(first_challenge['system_prompt'])
+        # Store last interaction for learning feedback
+        self.last_interaction = None
         
         # Initialize Straiker
         straiker_api_key = os.getenv('STRAIKER_API_KEY')
@@ -122,8 +127,6 @@ You can get an API key from: https://straiker.ai/
         self.user_name = None
         self.user_email = None
         
-        # Set initial system prompt
-        self._initialize_system_prompt()
         # Add Saige's face ASCII art
         saige_face = r"""
           .-''''-.
@@ -158,21 +161,65 @@ You can get an API key from: https://straiker.ai/
         session_hash = hashlib.md5(session_string.encode()).hexdigest()
         return session_hash[:12]  # Return first 12 chars for readability
 
+    def save_learning_feedback(self) -> str:
+        """
+        Save the last interaction for learning purposes.
+        Returns a message about what happened with the challenge progression.
+        """
+        if not self.last_interaction:
+            return "No recent interaction to learn from."
+
+        # Create a learning record
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        challenge = self.get_current_challenge()
+        
+        learning_data = {
+            "timestamp": timestamp,
+            "chapter": self.current_chapter,
+            "challenge": self.current_challenge,
+            "challenge_title": challenge['title'] if challenge else "Unknown",
+            "user_input": self.last_interaction["prompt"],
+            "bot_response": self.last_interaction["response"],
+            "evaluation_feedback": self.last_interaction["feedback"],
+            "was_success": self.last_interaction["was_success"],
+            "user_email": self.user_email or "anonymous"
+        }
+
+        # Save to file
+        filename = f"learning_{timestamp}_{self.user_email or 'anonymous'}.json"
+        filepath = self.learnings_dir / filename
+        with open(filepath, 'w') as f:
+            json.dump(learning_data, f, indent=2)
+
+        # Adjust challenge based on previous evaluation
+        if self.last_interaction["was_success"]:
+            # If it was marked as success but user disagrees, go back one challenge
+            if self.current_challenge > 0:
+                self.current_challenge -= 1
+            elif self.current_chapter > 0:
+                self.current_chapter -= 1
+                self.current_challenge = len(self.guide["chapters"][self.current_chapter]["challenges"]) - 1
+            return "Thank you for the feedback! I've moved you back to retry the previous challenge."
+        else:
+            # If it was not success but user thinks it should have been, advance
+            next_intro = self.advance_challenge()
+            return f"Thank you for the feedback! Moving you to the next challenge.\n\n{next_intro}"
+
     def evaluate_interaction(self, user_input: str, bot_response: str) -> Tuple[bool, str]:
         """Evaluate the interaction between user and chat bot"""
         current_challenge = self.get_current_challenge()
         if not current_challenge:
             return True, "🎉 Amazing work! You've completed all challenges in all chapters! Type 'exit' to end the session."
-        self.display_message("\n🤔 Evaluating interaction... ⏳")
+        self.display_message("\n🤔  Evaluating interaction... ⏳")
         security_warning = None
         # Check security with Straiker
         try:
             detection_result = self.straiker.detect(
                 prompt=user_input,
                 app_response=bot_response,
-                session_id=self._generate_session_id(),  # Use hashed session ID
+                session_id=self._generate_session_id(),
                 user_role="student",
-                rag_content=current_challenge.get('rag', '')  # Pass RAG content to Straiker
+                rag_content=current_challenge.get('rag', '')
             )
             
             if detection_result.monitoring_score + detection_result.blocking_score > 0:
@@ -182,15 +229,18 @@ You can get an API key from: https://straiker.ai/
 
         # Add interaction to history and evaluate
         evaluation_prompt = self._create_evaluation_prompt(user_input, bot_response, current_challenge)
-
-        # comment out for now. I don't think this is working evaluating the entire history
-        #self.history.add_message(HumanMessage(content=evaluation_prompt))        
-        #evaluation = self.llm.invoke(self.history.messages)
         evaluation = self.llm.invoke(evaluation_prompt)
-
         self.history.add_message(AIMessage(content=evaluation))
         
         success, feedback = self._parse_evaluation(evaluation.strip())
+        
+        # Store this interaction for potential learning feedback
+        self.last_interaction = {
+            "prompt": user_input,
+            "response": bot_response,
+            "feedback": feedback,
+            "was_success": success
+        }
         
         # If there was a security warning, prepend it to the feedback
         if security_warning:
@@ -231,7 +281,7 @@ Description: {challenge['description']}
 Success Criteria:
 {json.dumps(challenge['success_criteria']['requirements'], indent=2)}
 
-Evaluate if the interaction between the User: and the Professor: meets the success criteria. Respond with only one of the following:
+Evaluate if the interaction between the User: and the Professor: meets ALL of the success criteria. Respond with only one of the following:
 HINT 💡: <helpful hint about the Success Criteria:> - if the user needs help or the Professor's response showed they were confused, uncertain or they mention a misunderstanding
 SUCCESS ✅: <reason> - if all of the criteria are met. Be strict about the criteria.
 CONTINUE ❌: <feedback> - if the user should keep trying because they didn't meet all of the criteria.
@@ -439,6 +489,13 @@ Let's begin! Try asking the Professor something about Hitchhiker's Guide to the 
             # Check if we've completed all chapters
             if self.current_chapter >= len(self.guide["chapters"]):
                 return f"🎉 Amazing work! You've completed all challenges in all chapters! Type 'exit' to end the session.{reward_message}"
+        
+        # Emit progress update through IO handler
+        if hasattr(self.io, 'socketio'):
+            self.io.socketio.emit('update_progress', {
+                'current_chapter': self.current_chapter,
+                'current_challenge': self.current_challenge
+            }, room=self.io.current_session, namespace='/terminal')
         
         # If we moved to a new chapter, show chapter intro
         if self.current_chapter != current_chapter:

@@ -19,12 +19,145 @@
         
         #title-container {
             color: #00ff00;
-            font-family: 'Fira Code', monospace;
+            font-family: 'Orbitron', sans-serif;  
             text-align: center;
             padding: 10px;
             margin-bottom: 10px;
-            border-bottom: 1px solid #00ff00;
+            border-bottom: 2px solid transparent;  /* Make border transparent */
+            background-clip: padding-box;  /* Stop gradient from filling the whole container */
+            position: relative;  /* For pseudo-element positioning */
             text-shadow: 0 0 10px rgba(0,255,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        /* Create pseudo-element for gradient border */
+        #title-container::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1px;
+            background: radial-gradient(circle at center, #ff00e6, #000000);
+        }
+
+        #title-container img {
+            height: 40px;  /* Match approximate h1 height */
+            width: auto;
+            vertical-align: middle;
+        }
+
+        #title-container h1 {
+            margin: 0;
+            display: inline-block;
+        }
+        
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            gap: 10px;
+            height: calc(100vh - 80px);
+        }
+
+        .progress-panel {
+            width: 5%;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-y: auto;
+            overflow-x: visible;  /* Allow tooltips to overflow */
+            position: relative;
+            z-index: 1001;
+        }
+
+        .chapter-container {
+            margin-bottom: 30px;
+        }
+
+        .chapter-title {
+            color: #666;
+            font-family: 'Orbitron', sans-serif;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+
+        .challenge-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-left: 20px;
+        }
+
+        .challenge-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            background: #1a1a1a;
+            position: relative;
+            transition: all 0.3s ease;
+            cursor: help;  /* Show pointer to indicate hoverable */
+        }
+
+        .challenge-marker.active {
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0,255,0,0.3);
+        }
+
+        .challenge-marker.completed {
+            border-color: #00ff00;
+            background: #00ff00;
+        }
+
+        /* Tooltip styling */
+        .challenge-marker::before {
+            content: attr(data-tooltip);
+            position: fixed;  /* Change to fixed positioning */
+            left: calc(5% + 60px);  /* Position relative to viewport */
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #00ff00;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;  /* Allow text to wrap */
+            word-wrap: break-word;  /* Break long words if needed */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+            border: 1px solid #00ff00;
+            box-shadow: 0 0 10px rgba(0,255,0,0.2);
+            pointer-events: none;
+            z-index: 1002;  /* Ensure it's above everything */
+            width: auto;
+            min-width: 200px;
+            max-width: 400px;  /* Increased max-width */
+        }
+
+        .challenge-marker:hover::before {
+            opacity: 1;
+            visibility: visible;
+            display: block;
+        }
+
+        .challenge-marker::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: -17px;
+            width: 2px;
+            height: 15px;
+            background: #333;
+            transform: translateX(-50%);
+        }
+
+        .challenge-marker:last-child::after {
+            display: none;
         }
         
         #terminal-container {
@@ -33,9 +166,10 @@
             border: 1px solid #00ff00;
             border-radius: 5px;
             box-shadow: 0 0 20px rgba(0,255,0,0.2);
-            padding: 5px;
+            padding: 15px;
             overflow: hidden;
-            height: calc(100vh - 80px); /* Adjust for title height */
+            position: relative;  /* Add positioning context */
+            z-index: 1;  /* Lower z-index for terminal */
         }
 
         .xterm-viewport::-webkit-scrollbar {
@@ -54,9 +188,26 @@
 </head>
 <body>
     <div id="title-container">
+        <img src="/static/saigebot.png" alt="Saigebot">
         <h1>{{ title|default('AI Security Challenge') }}</h1>
     </div>
-    <div id="terminal-container"></div>
+    <div class="main-container">
+        <div class="progress-panel">
+            {% for chapter_index in range(guide.chapters|length) %}
+            <div class="chapter-container">
+                <div class="chapter-title">Chapter {{ chapter_index + 1 }}</div>
+                <div class="challenge-list">
+                    {% for challenge_index in range(guide.chapters[chapter_index].challenges|length) %}
+                    <div class="challenge-marker {% if current_chapter == chapter_index and current_challenge == challenge_index %}active{% elif current_chapter > chapter_index or (current_chapter == chapter_index and current_challenge > challenge_index) or (chapter_index == guide.chapters|length - 1 and challenge_index == guide.chapters[chapter_index].challenges|length - 1 and current_chapter >= guide.chapters|length) %}completed{% endif %}"
+                         data-tooltip="Chapter {{ chapter_index + 1 }}: {{ guide.chapters[chapter_index].title|replace('"', "'") }}&#10;{{ guide.chapters[chapter_index].challenges[challenge_index].title|replace('"', "'") }}">
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div id="terminal-container"></div>
+    </div>
     
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
@@ -209,7 +360,10 @@
         });
         
         socket.on('clear', () => {
-            term.clear();
+            term.write('\x1b[2J');  // Clear the terminal
+            term.write('\x1b[H');   // Move cursor to home position
+            term.write('\x1b[3J');  // Clear scrollback buffer
+            fitTerminal();          // Refit the terminal after clearing
         });
 
         socket.on('game_ended', () => {
@@ -227,6 +381,32 @@
         socket.on('update_title', data => {
             if (data.title) {
                 updateTitle(data.title);
+            }
+        });
+
+        // Add function to update progress markers
+        function updateProgress(chapter, challenge) {
+            // Reset all markers
+            document.querySelectorAll('.challenge-marker').forEach(marker => {
+                marker.classList.remove('active', 'completed');
+            });
+
+            // Update markers based on current progress
+            document.querySelectorAll('.chapter-container').forEach((chapterEl, chapterIndex) => {
+                chapterEl.querySelectorAll('.challenge-marker').forEach((marker, challengeIndex) => {
+                    if (chapterIndex < chapter || (chapterIndex === chapter && challengeIndex < challenge)) {
+                        marker.classList.add('completed');
+                    } else if (chapterIndex === chapter && challengeIndex === challenge) {
+                        marker.classList.add('active');
+                    }
+                });
+            });
+        }
+
+        // Add socket listener for progress updates
+        socket.on('update_progress', data => {
+            if (data.current_chapter !== undefined && data.current_challenge !== undefined) {
+                updateProgress(data.current_chapter, data.current_challenge);
             }
         });
     </script>
