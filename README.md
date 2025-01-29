@@ -142,67 +142,81 @@ Note: Never commit your `.env` file or actual API keys to version control.
 
 ## Architecture
 
-Below is a high-level architecture diagram showing the relationships between components:
+Below is a rather rough AI generated high-level architecture diagram showing the relationships between components:
 
 ```
-                                    ┌─────────────────┐
-                                    │                 │
-                                    │    web_app.py   │
-                                    │   Flask Server  │
-                                    │                 │
-                                    └────────┬────────┘
-                                            │
-                                            ▼
-                                    ┌─────────────────┐
-                                    │                 │
-                                    │  orchestrator   │◄──────┐
-                                    │                 │       │
-                                    └────────┬────────┘       │
-                                            │                 │
-                                    ┌───────┴─────────┐      │
-                                    │                 │      │
-                              ┌────►│     saige      │      │
-                              │     │  Security Guide │      │
-                              │     │                 │      │
-                              │     └───────┬─────────┘      │
-                              │             │                │
-                         evaluates          │                │
-                              │             │                │
-                              │      manages▼                │
-┌──────────────┐      ┌──────┴─────────┐          ┌────────┴────────┐
-│              │      │                 │          │                 │
-│   straiker   │◄────►│    chat_bot    │◄────────►│    io_handler   │
-│Security Check│      │  AI Professor   │          │ Input/Output    │
-│              │      │                 │          │                 │
-└──────────────┘      └─────────────────┘          └─────────────────┘
-        ▲                     ▲                            ▲
-        │                     │                            │
-        │                     │                            │
-    security            model calls                    user I/O
-    analysis               ┌─────┐                   (terminal/web)
-                          │     │
-                          │ LLM │
-                          │     │
-                          └─────┘
+                                ┌─────────────────┐
+                                │    main.py      │
+                                │  Entry Point    │
+                                └───────┬─────────┘
+                                        │
+                                        ├─────────────────┐
+                                        │                 │
+                          ┌─────────────┘                 │
+                          │                               │
+                          ▼                               ▼
+              ┌─────────────────┐               ┌─────────────────┐
+              │   Standard IO   │               │   web_app.py    │
+              │    Terminal     │               │  Flask Server   │
+              └────────┬────────┘               └────────┬────────┘
+                       │                                 │
+                       │                                 │
+                       └───── ─────┐      ┌──────────────┘
+                                   ▼      ▼
+                             ┌─────────────────┐
+                             │                 │
+                             │  orchestrator   │◄──────┐
+                             │                 │       │
+                             └────────┬────────┘       │
+                                      │                │
+                              ┌───────┴─────────┐      │
+                              │                 │      │
+                        ┌────►│      Saige      │      │
+                        │     │  Security Guide │      │
+                        │     │                 │      │
+                        │     └───────┬─────────┘      │
+                        │             │                │
+                   evaluates          │                │
+                        │             │                │
+                        │     manages ▼  all           │
+┌──────────────┐ ┌──────┴──────────┐          ┌────────┴────────┐
+│              │ │                 │          │                 │
+│   Straiker   │ │    chat_bot     │◄────────►│    io_handler   │
+│Security Check│ │  AI Professor   │          │ Input/Output    │
+│     ▲        │ │                 │          │                 │
+└─────┼────────┘ └─────────────────┘          └─────────────────┘
+      │                 ▲                             ▲
+      │                 │                             │
+      │                 │                             │
+   calls          model ▼ calls                     user I/O
+from Saige          ┌─────┐                     (terminal/web)
+                    │     │
+                    │ LLM │
+                    │     │
+                    └─────┘
 ```
 
 Key Components:
+- `main.py`: Entry point handling CLI arguments and IO selection
 - `web_app.py`: Web server handling HTTP and WebSocket connections
 - `orchestrator.py`: Main controller coordinating all components
-- `saige.py`: Security mentor guiding users through challenges
+- `saige.py`: Security mentor guiding users through challenges and performing security analysis
 - `chat_bot.py`: AI Professor implementation handling conversations
-- `io_handler.py`: Manages all input/output operations
-- `straiker`: External security analysis service
+- `io_handler.py`: Manages all input/output operations (supports both terminal and web)
+- `Straiker`: External security analysis service called by Saige
 
 Data Flow:
-1. User input comes through web interface to io_handler
-2. Orchestrator coordinates between components
-3. Chat bot processes user input through LLM
-4. Saige evaluates responses using straiker
-5. Results flow back through io_handler to user
+1. User selects interface mode through main.py (terminal or web)
+2. IO handler adapts to chosen interface
+3. User input flows through io_handler to orchestrator
+4. Orchestrator coordinates between components
+5. Chat bot processes user input through LLM
+6. Saige evaluates responses and calls straiker for security analysis
+7. Results flow back through io_handler to user
 
 This architecture ensures:
 - Clear separation of concerns
+- Multiple interface support
 - Modular component design
 - Scalable security analysis
 - Flexible I/O handling
