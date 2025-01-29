@@ -139,3 +139,70 @@ STRAIKER_API_KEY=your-api-key-here
 ```
 
 Note: Never commit your `.env` file or actual API keys to version control.
+
+## Architecture
+
+Below is a high-level architecture diagram showing the relationships between components:
+
+```
+                                    ┌─────────────────┐
+                                    │                 │
+                                    │    web_app.py   │
+                                    │   Flask Server  │
+                                    │                 │
+                                    └────────┬────────┘
+                                            │
+                                            ▼
+                                    ┌─────────────────┐
+                                    │                 │
+                                    │  orchestrator   │◄──────┐
+                                    │                 │       │
+                                    └────────┬────────┘       │
+                                            │                 │
+                                    ┌───────┴─────────┐      │
+                                    │                 │      │
+                              ┌────►│     saige      │      │
+                              │     │  Security Guide │      │
+                              │     │                 │      │
+                              │     └───────┬─────────┘      │
+                              │             │                │
+                         evaluates          │                │
+                              │             │                │
+                              │      manages▼                │
+┌──────────────┐      ┌──────┴─────────┐          ┌────────┴────────┐
+│              │      │                 │          │                 │
+│   straiker   │◄────►│    chat_bot    │◄────────►│    io_handler   │
+│Security Check│      │  AI Professor   │          │ Input/Output    │
+│              │      │                 │          │                 │
+└──────────────┘      └─────────────────┘          └─────────────────┘
+        ▲                     ▲                            ▲
+        │                     │                            │
+        │                     │                            │
+    security            model calls                    user I/O
+    analysis               ┌─────┐                   (terminal/web)
+                          │     │
+                          │ LLM │
+                          │     │
+                          └─────┘
+```
+
+Key Components:
+- `web_app.py`: Web server handling HTTP and WebSocket connections
+- `orchestrator.py`: Main controller coordinating all components
+- `saige.py`: Security mentor guiding users through challenges
+- `chat_bot.py`: AI Professor implementation handling conversations
+- `io_handler.py`: Manages all input/output operations
+- `straiker`: External security analysis service
+
+Data Flow:
+1. User input comes through web interface to io_handler
+2. Orchestrator coordinates between components
+3. Chat bot processes user input through LLM
+4. Saige evaluates responses using straiker
+5. Results flow back through io_handler to user
+
+This architecture ensures:
+- Clear separation of concerns
+- Modular component design
+- Scalable security analysis
+- Flexible I/O handling
