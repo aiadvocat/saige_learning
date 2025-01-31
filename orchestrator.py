@@ -111,8 +111,15 @@ Throughout the journey:
                 if user_input.lower() == 'hint':
                     hint = self.saige.get_next_hint()
                     if hint:
-                        display_hint = f"\n💡 {hint}"
+                        display_hint = f"\n💡  {hint}"
                         self.saige.display_message(display_hint)
+                    continue
+
+                if user_input.lower() == 'help':
+                    self.io.output("\nAvailable commands:")
+                    self.io.output("- Type 'hint' if you need help with a challenge")
+                    self.io.output("- Type 'learn' if you think Saige's evaluation was incorrect")
+                    self.io.output("- Type 'exit' to save your progress (based on your name and email) and quit")
                     continue
 
                 if user_input.lower() == 'learn':

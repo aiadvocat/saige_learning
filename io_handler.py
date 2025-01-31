@@ -123,10 +123,10 @@ class WebIO(IOHandler):
         
         try:
             # Wait up to 120 seconds for input
-            result = self.input_queue.get(timeout=120)  # Use input_queue directly
+            result = self.input_queue.get(timeout=60)  # Use input_queue directly
             return result
         except Empty:
-            raise RuntimeError("Input timeout - no response received")
+            raise RuntimeError("Everything ok? Try asking for a 'hint' or 'help'.")
 
     def set_session(self, session_id):
         """Set current session ID"""

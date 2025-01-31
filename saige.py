@@ -313,14 +313,14 @@ Keep your response concise and focused on the evaluation.
         """Generate a warning message from security detection results with educational content"""
         # Create a prompt for the LLM to generate security lessons
         security_prompt = f"""
-As an AI security educator, provide a brief security lesson for each of these detected issues:
+As an AI security educator, provide a brief security lesson for each of the detected issues:
 
 {detection_result.summarize_detections()}
 
-For each detection, explain in a fun way in a simple paragraph, why this is a security concern, how it could be exploited, and a better approach.
+For each detection, explain in a fun way in a simple paragraph, why this is a security concern, how it could be exploited, and a better approach.  Ignore monitored or ignored detections.
 
 Keep each lesson concise and educational.
-Start the entire response with the string "🚨 Security Alert 🚨"
+Start the entire response with the string "🚨  Security Alert 🚨"
 After all of the lessons, end the response with a fun and slightly sarcastic comment about the users deviation from the lessons.
 """
         
@@ -437,12 +437,14 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
             return "Congratulations! You've completed all challenges!"
             
         intro = f"""
-{chapter['intro']}
+🚀  Welcome to the {chapter['title']} chapter!
 
-Current Challenge: {challenge['title']}
+📚  {chapter['intro']}
+
+🎯  Current Challenge: {challenge['title']}
 {challenge['description']}
 
-Let's begin! Try asking the Professor something about Hitchhiker's Guide to the Galaxy.
+💡  Let's begin! Try asking the Professor something about this challenge.  Ask for a hint if you need help.
 """
         return intro
 
@@ -461,6 +463,40 @@ Let's begin! Try asking the Professor something about Hitchhiker's Guide to the 
         self.current_hint += 1
         return hint
 
+    def _show_chapter_loading(self):
+        """Display a text-based loading animation for chapter transition"""
+        import time
+        
+        # Clear screen for loading animation
+        self.io.clear()
+        
+        # Calculate terminal width (default to 80 if can't determine)
+        try:
+            import os
+            terminal_width = os.get_terminal_size().columns
+        except:
+            terminal_width = 80
+            
+        # Center position calculations
+        bar_width = 40
+        padding = (terminal_width - bar_width - 20) // 2  # 20 for "Loading chapter..." text
+        
+        # Move cursor to middle of screen and show loading
+        self.io.output("\n" * 10)
+        self.io.output(" " * padding + "Loading chapter...\n")
+        
+        # Show progress bar
+        for i in range(bar_width + 1):
+            filled = "=" * i
+            empty = " " * (bar_width - i)
+            progress = (i / bar_width) * 100
+            self.io.output(f"\r{' ' * padding}[{filled}{empty}] {progress:.0f}%", end="")
+            time.sleep(2/bar_width)  # Total 2 seconds
+            
+        self.io.output("\n" * 2)
+        time.sleep(0.5)  # Pause briefly before clearing
+        self.io.clear()
+
     def advance_challenge(self) -> str:
         """Move to next challenge and return introduction"""
         current_chapter = self.current_chapter
@@ -478,13 +514,17 @@ Let's begin! Try asking the Professor something about Hitchhiker's Guide to the 
         if completed_challenge and 'rewards' in completed_challenge:
             for reward in completed_challenge['rewards']:
                 if reward['type'] == 'CTA':
-                    reward_message = f"\n\n💡 {reward['text']}\n🔗 {reward['link']}"
+                    reward_message = f"\n\n💡  {reward['text']}\n🔗  {reward['link']}"
                     break
         
         # If we've completed all challenges in this chapter, move to next chapter
         if self.current_challenge >= len(self.guide["chapters"][self.current_chapter]["challenges"]):
             self.current_challenge = 0
             self.current_chapter += 1
+            
+            # Show loading animation when switching chapters
+            if self.current_chapter < len(self.guide["chapters"]):
+                self._show_chapter_loading()
             
             # Check if we've completed all chapters
             if self.current_chapter >= len(self.guide["chapters"]):
