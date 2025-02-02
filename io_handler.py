@@ -8,7 +8,7 @@ class IOHandler(ABC):
         pass
     
     @abstractmethod
-    def input(self, prompt: str = "") -> str:
+    def input(self, prompt: str = "", is_init: bool = False) -> str:
         """Get input with optional prompt"""
         pass
     
@@ -30,7 +30,7 @@ class TerminalIO(IOHandler):
         else:
             print(text, end=end)
     
-    def input(self, prompt: str = "") -> str:
+    def input(self, prompt: str = "", is_init: bool = False) -> str:
         return input(prompt)
     
     def clear(self):
@@ -112,7 +112,7 @@ class WebIO(IOHandler):
                 print(f"DEBUG Socket emit: Error sending output: {e}")
                 raise
     
-    def input(self, prompt: str = "") -> str:
+    def input(self, prompt: str = "", is_init: bool = False) -> str:
         """Get input for current session"""
         session_id = self.current_session
         if not session_id:
@@ -122,11 +122,17 @@ class WebIO(IOHandler):
         self.output(prompt, end="")
         
         try:
-            # Wait up to 120 seconds for input
+            # Wait up to 60 seconds for input
             result = self.input_queue.get(timeout=60)  # Use input_queue directly
             return result
         except Empty:
-            raise RuntimeError("Everything ok? Try asking for a 'hint' or 'help'.")
+            if is_init:
+                # During initialization, we should close the session gracefully
+                self.socketio.emit('game_ended', room=session_id, namespace='/terminal')
+                raise RuntimeError("Session timed out during initialization. Please refresh to start a new session.")
+            else:
+                # During normal gameplay, suggest hints/help
+                raise RuntimeError("Everything ok? Try asking for a 'hint' or 'help'.")
 
     def set_session(self, session_id):
         """Set current session ID"""

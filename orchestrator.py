@@ -30,26 +30,34 @@ class Orchestrator:
         
         # Get name
         while not self.user_name:
-            name = self.io.input("What's your name? ")
-            sanitized_name = self.sanitizer.sanitize_name(name)
-            if sanitized_name:
-                self.user_name = sanitized_name
-                self.prompt_prefix = sanitized_name
-            else:
-                self.io.output("Please enter a valid name (letters, numbers, spaces, hyphens, and apostrophes only).")
+            try:
+                name = self.io.input("What's your name? ", is_init=True)
+                sanitized_name = self.sanitizer.sanitize_name(name)
+                if sanitized_name:
+                    self.user_name = sanitized_name
+                    self.prompt_prefix = sanitized_name
+                else:
+                    self.io.output("Please enter a valid name (letters, numbers, spaces, hyphens, and apostrophes only).")
+            except RuntimeError as e:
+                if "Session timed out" in str(e):
+                    # Re-raise initialization timeouts
+                    raise
+                self.io.output("A timeout error occurred. Please try again.")
 
         # Get email
         while not self.user_email:
             try:
-                email = self.io.input("What's your email? ")
+                email = self.io.input("What's your email? ", is_init=True)
                 sanitized_email = self.sanitizer.sanitize_email(email)
                 if sanitized_email:
                     self.user_email = sanitized_email
                 else:
                     self.io.output("Please enter a valid email address.")
-            except Exception as e:
-                print(f"DEBUG: Exception in email input: {str(e)}")
-                raise
+            except RuntimeError as e:
+                if "Session timed out" in str(e):
+                    # Re-raise initialization timeouts
+                    raise
+                self.io.output("An timeout error occurred. Please try again.")
 
         # Update Saige with user info and check for existing progress
         welcome_back = self.saige.set_user_info(self.user_name, self.user_email)
@@ -76,12 +84,7 @@ Some will test your ability to keep AI systems within their bounds,
 others will challenge you to make them break those very same bounds!
 
 Saige will analyze your interactions for both successes and security concerns.
-Yes, sometimes we'll ask you to trigger those security alerts - that's how we learn!
-
-Throughout the journey:
-- Type 'hint' if you need help with a challenge
-- Type 'learn' if you think Saige's evaluation was incorrect
-- Type 'exit' to save your progress (based on your name and email) and quit\n""")
+Yes, sometimes we'll ask you to trigger those security alerts - that's how we learn!""")
 
         # Get user info before starting
         self._get_user_info()
