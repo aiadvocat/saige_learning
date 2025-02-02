@@ -19,4 +19,6 @@ pydantic>=2.5.2
 typing-extensions>=4.8.0
 
 # Project Specific
-# straiker-sdk>=0.1.0  # If this is published to PyPI, otherwise comment out 
+# straiker-sdk>=0.1.0  # If this is published to PyPI, otherwise comment out
+chromadb
+sentence-transformers 
