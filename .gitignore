@@ -36,5 +36,6 @@ env/
 # Project specific
 progress/
 learnings/
+chroma_db
 *.log
 .DS_Store 

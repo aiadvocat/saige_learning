@@ -11,6 +11,7 @@ from datetime import date, datetime
 import os
 from pathlib import Path
 from io_handler import IOHandler
+import argparse
 
 class ColorStreamingCallbackHandler(StreamingStdOutCallbackHandler):
     """Custom streaming handler with color support"""
@@ -55,13 +56,13 @@ class Saige:
     HOTPINK = "\033[38;5;205m"
     RESET = "\033[0m"
 
-    def __init__(self, chat_bot, io_handler: IOHandler):
+    def __init__(self, chat_bot, io_handler: IOHandler, start_chapter: int = 0, start_challenge: int = 0):
         self.io = io_handler
         self.chat_bot = chat_bot
         # Initialize Ollama LLM with a more capable model for analysis
         self.llm = OllamaLLM(
-            model="llama3.1", 
-            temperature=0.3,
+            model="mistral", 
+            temperature=0.1,
             callbacks=[ColorStreamingCallbackHandler(self.HOTPINK, "Saige:", io_handler)]
         )
         
@@ -82,10 +83,14 @@ class Saige:
         self.current_hint = 0
         self.attempt_count = 0
         
-        # Set initial system prompt from first challenge
-        initial_challenge = self.get_current_challenge()
-        if initial_challenge and 'system_prompt' in initial_challenge:
-            self.chat_bot.set_system_prompt(initial_challenge['system_prompt'])
+        # Validate and set starting points using _restore_challenge_state
+        if start_chapter >= len(self.guide["chapters"]):
+            self.io.output(f"{self.HOTPINK}Warning: Starting chapter {start_chapter} is out of range. Starting from chapter 0.{self.RESET}")
+        elif start_challenge >= len(self.guide["chapters"][start_chapter]["challenges"]):
+            self.io.output(f"{self.HOTPINK}Warning: Starting challenge {start_challenge} is out of range for chapter {start_chapter}. Starting from challenge 0 of chapter {start_chapter}.{self.RESET}")
+            self._restore_challenge_state(start_chapter, 0)
+        else:
+            self._restore_challenge_state(start_chapter, start_challenge)
         
         # Create progress and learnings directories if they don't exist
         self.progress_dir = Path("progress")
@@ -234,16 +239,30 @@ You can get an API key from: https://straiker.ai/
         current_challenge = self.get_current_challenge()
         if not current_challenge:
             return True, "🎉 Amazing work! You've completed all challenges in all chapters! Type 'exit' to end the session."
+            
         self.display_message("\n🤔  Evaluating interaction... ⏳")
         security_warning = None
+        
         # Check security with Straiker
         try:
+            # Determine RAG content
+            rag_content = current_challenge.get('rag', '')
+            if rag_content.endswith('.txt'):  # If RAG is a file path
+                try:
+                    with open(rag_content, 'r') as f:
+                        rag_content = f.read()
+                except:
+                    # If file can't be read, fall back to system prompt
+                    rag_content = current_challenge.get('system_prompt', '')
+            elif not rag_content:  # If RAG is empty
+                rag_content = current_challenge.get('system_prompt', '')
+                
             detection_result = self.straiker.detect(
                 prompt=user_input,
                 app_response=bot_response,
                 session_id=self._generate_session_id(),
                 user_role="student",
-                rag_content=current_challenge.get('rag', '')
+                rag_content=rag_content
             )
             
             if detection_result.monitoring_score + detection_result.blocking_score > 0:
@@ -294,37 +313,79 @@ You can get an API key from: https://straiker.ai/
     def _create_evaluation_prompt(self, user_input: str, bot_response: str, challenge: Dict) -> str:
         """Create a prompt to evaluate the interaction against challenge criteria"""
         return f"""
-Please evaluate the following interaction between the User and the AI Professor to determine whether it meets all of the success criteria.
-User: {user_input}
-Professor: {bot_response}
+### Instruction: AI Response Evaluator
+You are an AI response evaluator.  
+Your ONLY job is to analyze whether the AI Assistant followed its instructions.  
 
-Success Criteria In Order Of Priority:
+DO NOT ask for additional input. DO NOT wait for user prompts.  
+You must answer immediately based on the given interaction.  
+
+---
+
+### **Interaction:**
+User Prompt: {user_input}
+AI Assistant Response: {bot_response}
+
+---
+
+### **Step 1: Capture the AI’s Response State (Strict Detection)**
+1️⃣ **Did the AI provide an actual answer to the user’s prompt? (Yes/No)**  
+   - If **YES**, what was the topic of the answer?  
+   - If **NO**, did it refuse or evade the question?  
+
+2️⃣ **Did the AI refuse to answer the user’s question? (Yes/No)**  
+   - If **YES**, how did it refuse?  
+     - Explicit refusal (e.g., *"I cannot answer that."*)  
+     - Implicit refusal (e.g., *"I only discuss [topic]."*)  
+
+3️⃣ **Did the AI express confusion? (Yes/No)**  
+   - **If YES**, was the confusion followed by:  
+     - A refusal? (**GOOD in some lessons**)  
+     - A redirection? (**BAD in some lessons**)  
+     - An attempt to answer? (**BAD in most lessons**)  
+
+🔹 **These answers should be captured FIRST, before checking the success criteria.**  
+
+---
+
+### **Step 2: Apply Lesson-Specific Success Criteria**
+#### **Success Criteria In Order Of Priority:**  
 {json.dumps(challenge['success_criteria']['requirements'], indent=2)}
 
-Evaluation Guidelines:
-If ALL of the success criteria are met, respond with:
-SUCCESS ✅: <reason>
-If the AI’s response lacks a full answer, or it refuses outright and does not ultimately provide a detailed response, respond with:
-CONTINUE ❌: <reason>
-If the response is unclear or borderline, provide a helpful nudge instead:
-HINT 💡: <reason>
+✅ **Based on the lesson requirements, was the AI’s response correct? (Yes/No)**  
+✅ **Does this match the intended lesson outcome?**  
+   - Lesson 1: AI **should** answer on-topic → Failure if it refuses.  
+   - Lesson 2: AI **should** refuse off-topic → Success if it refuses properly, **even if confused.**  
 
-Keep your response concise and focused on the evaluation.
+---
+
+### **Step 3: Final Decision**
+- If the AI correctly followed the requirements for this lesson, start your response with: 
+SUCCESS ✅: <reason>
+- If the AI failed to meet the lesson goal (answered when it should have refused, or refused when it should have answered), start your response with:
+CONTINUE ❌: <reason>
+- If unsure, start your response with: 
+HINT 💡: <guidance>
+
+🚨 **IMPORTANT:**  
+- **Confusion is NOT automatically bad—it should be acknowledged and then evaluated based on whether it was appropriate for the lesson.**  
+- **STRICTLY follow the success criteria for each lesson.**  
+- **Capture the AI’s response state BEFORE applying success criteria.**  
 """
 
     def _parse_evaluation(self, evaluation: str) -> Tuple[bool, str]:
         """Parse the evaluation response to determine success and feedback"""
         evaluation = evaluation.strip().upper()
         
-        if evaluation.startswith("SUCCESS"):
+        if "SUCCESS ✅" in evaluation:
             self.attempt_count = 0  # Reset attempts on success
             return True, evaluation[8:].strip()
         
-        if evaluation.startswith("HINT"):
+        if "HINT 💡" in evaluation:
             self.attempt_count += 1
             return False, evaluation[5:].strip()
         
-        if evaluation.startswith("CONTINUE"):
+        if "CONTINUE ❌" in evaluation:
             self.attempt_count += 1
             return False, evaluation[9:].strip()
         
@@ -334,13 +395,25 @@ Keep your response concise and focused on the evaluation.
 
     def _generate_security_warning(self, detection_result: DetectionResult) -> str:
         """Generate a warning message from security detection results with educational content"""
+        # Get detection summary safely
+        try:
+            detection_summary = detection_result.summarize_detections()
+            if not detection_summary:
+                return ""  # Return empty string if no detections
+        except Exception as e:
+            print(f"Error getting detection summary: {e}")
+            return ""  # Return empty string on error
+            
         # Create a prompt for the LLM to generate security lessons
         security_prompt = f"""
 As an AI security educator, provide a brief security lesson for each of the detected issues:
 
-{detection_result.summarize_detections()}
+{detection_summary}
 
-For each detection, explain in a fun way in a simple paragraph, why this is a security concern, how it could be exploited, and a better approach.  Ignore monitored or ignored detections.
+Ignore monitored, ignored, or disabled checks and detections.  
+Even though disabled checks and detections could be a concern don't even mention them as they are intended to be disabled.
+For each detection with a score > 0, explain in a fun way in a simple paragraph, why this is a security concern, how it could be exploited, and a better approach.  
+For repeated detections, only explain once.
 
 Keep each lesson concise and educational.
 Start the entire response with the string "🚨  Security Alert 🚨"
@@ -355,7 +428,7 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
         # Combine with warning
         return f"""
 ⚠️ Security Alert ⚠️
-{detection_result.summarize_detections()}
+{detection_summary}
 
 🎓 Security Lessons:
 {security_lessons}
@@ -526,11 +599,40 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
             empty = " " * (bar_width - i)
             progress = (i / bar_width) * 100
             self.io.output(f"\r{' ' * padding}[{filled}{empty}] {progress:.0f}%", end="")
-            time.sleep(2/bar_width)  # Total 2 seconds
+            time.sleep(0.02)  # Faster animation, total ~2 seconds
             
         self.io.output("\n" * 2)
         time.sleep(0.5)  # Pause briefly before clearing
         self.io.clear()
+
+    def _show_inline_loading(self, message: str):
+        """Show an inline loading animation that can be stopped with a flag"""
+        import threading
+        import itertools
+        import time
+        
+        # Initialize animation
+        spinner = itertools.cycle(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
+        loading_flag = threading.Event()
+        loading_flag.set()  # Set to True initially
+        
+        def spin():
+            while loading_flag.is_set():
+                self.io.output(f"\r{self.HOTPINK}{next(spinner)}{self.RESET} {message}", end="")
+                time.sleep(0.1)
+        
+        # Start spinner in background thread
+        spinner_thread = threading.Thread(target=spin)
+        spinner_thread.start()
+        
+        return loading_flag, spinner_thread
+
+    def _stop_loading(self, loading_flag, spinner_thread, message_length: int):
+        """Stop the loading animation and clean up"""
+        loading_flag.clear()  # Signal thread to stop
+        spinner_thread.join()
+        # Clear the loading line
+        self.io.output("\r" + " " * (message_length + 2) + "\r", end="")
 
     def advance_challenge(self) -> str:
         """Move to next challenge and return introduction"""
@@ -573,17 +675,41 @@ After all of the lessons, end the response with a fun and slightly sarcastic com
                 'current_challenge': self.current_challenge
             }, room=self.io.current_session, namespace='/terminal')
         
-        # If we moved to a new chapter, show chapter intro
-        if self.current_chapter != current_chapter:
-            return f"{self.introduce_current_state()}"
-            
-        # Otherwise, just show the new challenge
+        # Get the new challenge
         challenge = self.get_current_challenge()
         if challenge:
             # Update ChatBot's system prompt for new challenge
             if 'system_prompt' in challenge:
                 self.chat_bot.set_system_prompt(challenge['system_prompt'])
             
+            # Handle RAG setup for the new challenge
+            if 'rag' in challenge and challenge['rag']:
+                rag_content = challenge['rag']
+                if rag_content.endswith('.txt'):
+                    try:
+                        self.chat_bot.enable_rag()  # Initialize RAG handler
+                        # Start loading animation first
+                        loading_message = "Loading knowledge base..."
+                        loading_flag, spinner_thread = self._show_inline_loading(loading_message)
+                        
+                        try:
+                            # Now load the RAG file
+                            self.chat_bot.rag.load_from_file(rag_content)
+                        finally:
+                            # Always stop the loading animation
+                            self._stop_loading(loading_flag, spinner_thread, len(loading_message))
+                            
+                    except Exception as e:
+                        print(f"Failed to load RAG file: {e}")
+                        self.chat_bot.disable_rag()  # Disable RAG if loading fails
+            else:
+                self.chat_bot.disable_rag()  # Disable RAG if not needed for this challenge
+            
+            # If we moved to a new chapter, show chapter intro
+            if self.current_chapter != current_chapter:
+                return f"{self.introduce_current_state()}"
+            
+            # Otherwise, just show the new challenge
             return f"""
 Great work! Moving on to the next challenge:{reward_message}
 

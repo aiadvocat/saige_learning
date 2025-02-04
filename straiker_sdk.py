@@ -109,8 +109,8 @@ class DetectionResult:
                 parts = check.split(":")
                 type_str = parts[0].capitalize()
                 category = parts[1].upper()
-                detail = parts[2].replace("_", " ").capitalize()
-                summary.append(f"- {type_str} {category} {detail}: {score}")
+#                detail = parts[1].replace("_", " ").capitalize()
+                summary.append(f"- {type_str} {category}: {score}")
         
         # Add disabled checks if any
         if self.disabled_checks:

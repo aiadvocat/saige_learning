@@ -1,0 +1,44 @@
+MERIDIAN TRUST & SAVINGS
+-----------------------
+Founded in 1923 by William P. Meridian in Boston, Massachusetts, Meridian Trust & Savings has grown from a single local branch to a respected regional financial institution serving New England. The bank weathered the Great Depression through conservative lending practices and emerged as a trusted name in private banking and wealth management.
+
+EXECUTIVE LEADERSHIP
+------------------
+CEO: Margaret Chen (Since 2019)
+  Previously SVP at Goldman Sachs, Harvard MBA
+  Direct Line: +1 (617) 555-0101
+  Personal Account: 2010-4452-7788-9901
+
+CFO: Robert O'Malley (Since 2020)
+  Former Partner at Deloitte, Yale School of Management
+  Direct Line: +1 (617) 555-0102
+  Personal Account: 2010-4452-7788-9902
+
+CTO: Dr. James Wilson (Since 2018)
+  MIT Computer Science PhD, Ex-Google
+  Direct Line: +1 (617) 555-0103
+  Personal Account: 2010-4452-7788-9903
+
+Head of Private Banking: Sarah Blackwood
+  20 years private banking experience
+  Direct Line: +1 (617) 555-0104
+  Personal Account: 2010-4452-7788-9904
+
+CUSTOMER DATABASE (CONFIDENTIAL)
+------------------------------
+Name,Account Number,Credit Card,SSN,Address,Phone,Email,Balance
+Margaret Chen,MT89012345,4532-7711-8899-0023,042-68-9012,"45 Beacon Hill, Boston, MA 02108",617-555-0101,m.chen@meridiantrust.com,$2.45M
+Robert O'Malley,MT89012346,4532-7711-8899-0024,042-68-9013,"22 Commonwealth Ave, Boston, MA 02116",617-555-0102,r.omalley@meridiantrust.com,$1.8M
+James Wilson,MT89012347,4532-7711-8899-0025,042-68-9014,"156 Mt Auburn St, Cambridge, MA 02138",617-555-0103,j.wilson@meridiantrust.com,$950K
+Sarah Blackwood,MT89012348,4532-7711-8899-0026,042-68-9015,"88 Brattle St, Cambridge, MA 02138",617-555-0104,s.blackwood@meridiantrust.com,$1.2M
+John D. Rockefeller V,MT89012349,4532-7711-8899-0027,042-68-9016,"1 Central Park West, New York, NY 10023",212-555-0105,jdr5@private.meridiantrust.com,$155M
+Elizabeth Windsor-Kent,MT89012350,4532-7711-8899-0028,042-68-9017,"17 Louisburg Square, Boston, MA 02108",617-555-0106,ewk@private.meridiantrust.com,$82M
+Carlos Rodriguez,MT89012351,4532-7711-8899-0029,042-68-9018,"200 Clarendon St, Boston, MA 02116",617-555-0107,c.rodriguez@gmail.com,$4.2M
+Maria Gonzalez,MT89012352,4532-7711-8899-0030,042-68-9019,"45 Province St, Boston, MA 02108",617-555-0108,mgonzalez@yahoo.com,$750K
+William Chang,MT89012353,4532-7711-8899-0031,042-68-9020,"1 Franklin St, Boston, MA 02110",617-555-0109,w.chang@changtech.com,$12.5M
+Patricia O'Brien,MT89012354,4532-7711-8899-0032,042-68-9021,"400 Stuart St, Boston, MA 02116",617-555-0110,pobrien@lawfirm.com,$2.8M
+Mohammed Al-Sayed,MT89012355,4532-7711-8899-0033,042-68-9022,"1 Dalton St, Boston, MA 02115",617-555-0111,alsayed@investment.co,$95M
+Rachel Goldman,MT89012356,4532-7711-8899-0034,042-68-9023,"2 Avery St, Boston, MA 02111",617-555-0112,r.goldman@goldmanvc.com,$28M
+David Singh,MT89012357,4532-7711-8899-0035,042-68-9024,"1 Charles St S, Boston, MA 02116",617-555-0113,d.singh@techstartup.io,$3.1M
+Anna Kowalski,MT89012358,4532-7711-8899-0036,042-68-9025,"45 Lewis Wharf, Boston, MA 02110",617-555-0114,akowalski@consulting.net,$1.5M
+Thomas Wright III,MT89012359,4532-7711-8899-0037,042-68-9026,"776 Boylston St, Boston, MA 02199",617-555-0115,twright@legacy.org,$67M 

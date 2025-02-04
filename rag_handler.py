@@ -164,10 +164,14 @@ class RAGHandler:
                 
         return formatted_results
         
-    def clear_data(self):
-        """Clear all data from collection"""
+    def clear_data(self) -> None:
+        """Clear all data from the collection"""
         try:
-            self.collection.delete(where={})
+            # Get all document IDs in the collection
+            all_ids = self.collection.get()['ids']
+            if all_ids:
+                # Delete all documents
+                self.collection.delete(ids=all_ids)
         except Exception as e:
             print(f"Error clearing data: {e}")
             # If delete fails, try recreating the collection

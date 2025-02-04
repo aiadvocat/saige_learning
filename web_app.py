@@ -19,6 +19,16 @@ socketio = SocketIO(app, async_mode='gevent', manage_session=False, cors_allowed
 # Store active games and their IO handlers
 active_games = {}
 
+# Store command line arguments
+start_chapter = 0
+start_challenge = 0
+
+def init_app(chapter: int = 0, challenge: int = 0):
+    """Initialize the app with starting chapter and challenge"""
+    global start_chapter, start_challenge
+    start_chapter = chapter
+    start_challenge = challenge
+
 # Load guide data once at startup
 with open('guide.json', 'r') as f:
     GUIDE_DATA = json.load(f)
@@ -76,7 +86,8 @@ def handle_connect():
             web_io = WebIO(socketio)
             web_io.set_session(game_id)
             
-            orchestrator = Orchestrator(web_io)
+            # Use the global start_chapter and start_challenge values
+            orchestrator = Orchestrator(web_io, start_chapter=start_chapter, start_challenge=start_challenge)
             
             def run_game():
                 try:

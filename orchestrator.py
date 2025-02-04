@@ -10,10 +10,10 @@ class Orchestrator:
     GREEN = "\033[32m"
     RESET = "\033[0m"
 
-    def __init__(self, io_handler: IOHandler):
+    def __init__(self, io_handler: IOHandler, start_chapter: int = 0, start_challenge: int = 0):
         self.io = io_handler
         self.chat_bot = ChatBot(io_handler)
-        self.saige = Saige(self.chat_bot, io_handler)
+        self.saige = Saige(self.chat_bot, io_handler, start_chapter=start_chapter, start_challenge=start_challenge)
         self.user_name = None
         self.user_email = None
         self.prompt_prefix = "You"
