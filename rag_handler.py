@@ -6,6 +6,7 @@ from pathlib import Path
 import hashlib
 from typing import List, Dict, Optional
 import re
+import time
 
 class RAGHandler:
     def __init__(self, collection_name: str = "company_data"):
@@ -63,6 +64,7 @@ class RAGHandler:
             ids = []
             
             for i, chunk in enumerate(chunks):
+                time.sleep(0.5) 
                 doc_id = f"chunk_{text_hash}_{i}"
                 documents.append(chunk)
                 metadatas.append({
@@ -71,6 +73,7 @@ class RAGHandler:
                     "total_chunks": len(chunks)
                 })
                 ids.append(doc_id)
+ # Give IO a chance to display loading animation
             
             # Add to collection
             self.collection.add(
