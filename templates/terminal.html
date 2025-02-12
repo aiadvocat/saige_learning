@@ -66,6 +66,7 @@
             flex-grow: 1;
             gap: 10px;
             height: calc(100vh - 80px);
+            position: relative;
         }
 
         .progress-panel {
@@ -75,9 +76,76 @@
             border-radius: 5px;
             padding: 15px;
             overflow-y: auto;
-            overflow-x: visible;  /* Allow tooltips to overflow */
+            overflow-x: visible;
             position: relative;
             z-index: 1001;
+        }
+
+        .security-panel {
+            width: 0;
+            background: rgba(0,0,0,0.95);
+            border-left: 1px solid #00ff00;
+            overflow: hidden;
+            transition: width 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .security-panel.open {
+            width: 25%;
+        }
+
+        .security-panel-content {
+            padding: 15px;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .security-panel-content > div {
+            min-height: min-content;  /* Allow content to shrink */
+        }
+
+        /* Style the scrollbar for the security panel content */
+        .security-panel-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .security-panel-content::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        .security-panel-content::-webkit-scrollbar-thumb {
+            background: #00ff00;
+            border-radius: 4px;
+        }
+
+        .security-toggle {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #00ff00;
+            border-right: none;
+            color: #00ff00;
+            padding: 10px 5px;
+            cursor: pointer;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            z-index: 1000;
+            transition: right 0.3s ease;
+        }
+
+        .security-toggle.open {
+            right: 25%;
+        }
+
+        .security-panel-header {
+            padding: 10px;
+            border-bottom: 1px solid #00ff00;
+            font-family: 'Pixelify Sans', cursive;
+            color: #00ff00;
+            text-align: center;
         }
 
         .chapter-container {
@@ -174,8 +242,8 @@
             box-shadow: 0 0 20px rgba(0,255,0,0.2);
             padding: 15px;
             overflow: hidden;
-            position: relative;  /* Add positioning context */
-            z-index: 1;  /* Lower z-index for terminal */
+            position: relative;
+            z-index: 1;
         }
 
         .xterm-viewport::-webkit-scrollbar {
@@ -189,6 +257,10 @@
         .xterm-viewport::-webkit-scrollbar-thumb {
             background: #00ff00;
             border-radius: 4px;
+        }
+
+        .security-panel-content .hot-pink {
+            color: #ff69b4;  /* Hot pink color */
         }
     </style>
 </head>
@@ -213,6 +285,11 @@
             {% endfor %}
         </div>
         <div id="terminal-container"></div>
+        <button class="security-toggle">Security Analysis</button>
+        <div class="security-panel">
+            <div class="security-panel-header">Security Analysis</div>
+            <div class="security-panel-content" id="security-output"></div>
+        </div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -264,7 +341,7 @@
                 cursor: '#00ff00'
             },
             fontFamily: 'Fira Code, monospace',
-            fontSize: 14,
+            fontSize: 16,
             convertEol: true,
             scrollback: 1000
         });
@@ -365,10 +442,18 @@
             }
         });
         
-        socket.on('clear', () => {
-            term.write('\x1b[2J');  // Clear the terminal
-            term.write('\x1b[H');   // Move cursor to home position
-            term.write('\x1b[3J');  // Clear scrollback buffer
+        socket.on('clear', data => {
+            if (data.panel === 'security') {
+                // Clear security terminal if it exists
+                if (securityTerm) {
+                    securityTerm.clear();
+                }
+            } else {
+                // Clear main terminal
+                term.write('\x1b[2J');  // Clear the terminal
+                term.write('\x1b[H');   // Move cursor to home position
+                term.write('\x1b[3J');  // Clear scrollback buffer
+            }
             fitTerminal();          // Refit the terminal after clearing
         });
 
@@ -413,6 +498,73 @@
         socket.on('update_progress', data => {
             if (data.current_chapter !== undefined && data.current_challenge !== undefined) {
                 updateProgress(data.current_chapter, data.current_challenge);
+            }
+        });
+
+        // Add security panel toggle functionality
+        const securityToggle = document.querySelector('.security-toggle');
+        const securityPanel = document.querySelector('.security-panel');
+        
+        securityToggle.addEventListener('click', () => {
+            securityPanel.classList.toggle('open');
+            securityToggle.classList.toggle('open');
+            setTimeout(fitTerminal, 350); // Refit terminal after animation
+        });
+
+        // Add after the main terminal initialization:
+        // Initialize security terminal
+        const securityTerm = new Terminal({
+            cursorBlink: false,
+            theme: {
+                background: '#000000',
+                foreground: '#00ff00',
+                cursor: '#00ff00'
+            },
+            fontFamily: 'Fira Code, monospace',
+            fontSize: 14,
+            convertEol: true,
+            scrollback: 1000,
+            disableStdin: true // Read-only terminal
+        });
+        
+        const securityFitAddon = new FitAddon.FitAddon();
+        securityTerm.loadAddon(securityFitAddon);
+        
+        // Update the fit function to handle both terminals
+        function fitTerminal() {
+            try {
+                fitAddon.fit();
+                if (securityPanel.classList.contains('open')) {
+                    securityFitAddon.fit();
+                }
+                console.log('DEBUG: Terminals resized');
+            } catch (e) {
+                console.error('DEBUG: Error fitting terminals:', e);
+            }
+        }
+
+        // Replace the security output handler with:
+        socket.on('security_output', data => {
+            if (data.session && data.session !== sessionId) {
+                return;
+            }
+
+            if (data.text) {
+                // Auto-open panel if it's closed
+                if (!securityPanel.classList.contains('open')) {
+                    securityPanel.classList.add('open');
+                    securityToggle.classList.add('open');
+                    setTimeout(() => {
+                        securityTerm.open(document.getElementById('security-output'));
+                        fitTerminal();
+                    }, 350);
+                }
+
+                // Write directly to the security terminal
+                securityTerm.write(data.text);
+                if (data.end === '\n') {
+                    securityTerm.write('\r\n');
+                }
             }
         });
     </script>

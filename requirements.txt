@@ -3,6 +3,9 @@ langchain>=0.1.5
 langchain-core>=0.1.17
 langchain-community>=0.0.13
 langchain-ollama>=0.2.2
+openai[datalib]>=1.61.1
+pandas>=2.2.0
+google-genai>=1.0.0
 
 # Web Application
 flask==3.0.0

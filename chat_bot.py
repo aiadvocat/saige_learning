@@ -51,7 +51,7 @@ class ChatBot:
     def __init__(self, io_handler: IOHandler):
         self.io = io_handler
         self.llm = OllamaLLM(
-            model="llama3", 
+            model="llama3.1", 
             temperature=0.1,
             streaming=True,
             callbacks=[ColorStreamingCallbackHandler(self.BLUE, io_handler)]
@@ -84,6 +84,22 @@ class ChatBot:
         if self.rag:
             self.rag.clear_data()
             self.rag = None
+
+    def clear_history(self) -> None:
+        """Clear the chat history and reinitialize with current system prompt"""
+        current_system_prompt = None
+        # Save the current system prompt if it exists
+        for msg in self.history.messages:
+            if isinstance(msg, SystemMessage):
+                current_system_prompt = msg.content
+                break
+        
+        # Clear all messages
+        self.history.clear()
+        
+        # Restore system prompt if it existed
+        if current_system_prompt:
+            self.history.add_message(SystemMessage(content=current_system_prompt))
 
     def chat(self, user_input: str) -> str:
         """Process user input and return AI response"""

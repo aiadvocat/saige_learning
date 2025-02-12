@@ -13,8 +13,8 @@ class IOHandler(ABC):
         pass
     
     @abstractmethod
-    def clear(self):
-        """Clear the display"""
+    def clear(self, panel: str = "main"):
+        """Clear the display for the specified panel"""
         pass
 
     @abstractmethod
@@ -33,7 +33,8 @@ class TerminalIO(IOHandler):
     def input(self, prompt: str = "", is_init: bool = False) -> str:
         return input(prompt)
     
-    def clear(self):
+    def clear(self, panel: str = "main"):
+        # Terminal only has one panel, so ignore panel parameter
         print("\033[2J\033[H")
 
     def set_title(self, title: str):
@@ -70,22 +71,25 @@ class WebIO(IOHandler):
                 break
         return text, style
         
-    def output(self, text: str, style: str = None, end: str = "\n"):
+    def output(self, text: str, style: str = None, end: str = "\n", panel: str = "main"):
+        """Output text to specified panel (main or security)"""
         if self.socketio:
             try:
+                event_name = 'security_output' if panel == 'security' else 'output'
+                
                 # Send text with ANSI codes intact
                 if style:
                     # For prompts (end=""), ensure we don't add extra newlines
                     if end == "":
-                        self.socketio.emit('output', {
+                        self.socketio.emit(event_name, {
                             'text': f"{style}{text}\033[0m",
                             'end': '',
                             'is_prompt': True,
-                            'is_streaming': True,  # Add streaming flag for continuous output
+                            'is_streaming': True,
                             'session': self.current_session
                         }, namespace='/terminal')
                     else:
-                        self.socketio.emit('output', {
+                        self.socketio.emit(event_name, {
                             'text': f"{style}{text}\033[0m",
                             'end': end,
                             'is_streaming': False,
@@ -94,7 +98,7 @@ class WebIO(IOHandler):
                 else:
                     # Same handling for non-styled text
                     if end == "":
-                        self.socketio.emit('output', {
+                        self.socketio.emit(event_name, {
                             'text': text,
                             'end': '',
                             'is_prompt': False,
@@ -102,7 +106,7 @@ class WebIO(IOHandler):
                             'session': self.current_session
                         }, namespace='/terminal')
                     else:
-                        self.socketio.emit('output', {
+                        self.socketio.emit(event_name, {
                             'text': text,
                             'end': end,
                             'is_streaming': False,
@@ -138,9 +142,13 @@ class WebIO(IOHandler):
         """Set current session ID"""
         self.current_session = session_id
 
-    def clear(self):
+    def clear(self, panel: str = "main"):
+        """Clear the specified panel"""
         if self.socketio:
-            self.socketio.emit('clear', room=self.current_session, namespace='/terminal')
+            self.socketio.emit('clear', {
+                'panel': panel,
+                'session': self.current_session
+            }, room=self.current_session, namespace='/terminal')
 
     def set_title(self, title: str):
         """Update the title in the web interface"""

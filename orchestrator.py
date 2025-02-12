@@ -18,6 +18,25 @@ class Orchestrator:
         self.user_email = None
         self.prompt_prefix = "You"
         self.sanitizer = InputSanitizer()
+        self.is_web = hasattr(self.io, 'socketio')
+
+    def set_user_info(self, name: str, email: str) -> None:
+        """Set user information and update related components"""
+        sanitized_name = self.sanitizer.sanitize_name(name)
+        sanitized_email = self.sanitizer.sanitize_email(email)
+        
+        if sanitized_name and sanitized_email:
+            self.user_name = sanitized_name
+            self.user_email = sanitized_email
+            self.prompt_prefix = sanitized_name
+            # Set user info in Saige
+            self.saige.set_user_info(sanitized_name, sanitized_email)
+        else:
+            raise ValueError("Invalid user information provided")
+
+    def get_user_info(self) -> tuple[str, str]:
+        """Get the current user's name and email"""
+        return self.user_name, self.user_email
 
     def _validate_email(self, email: str) -> bool:
         """Simple email validation"""
@@ -64,6 +83,78 @@ class Orchestrator:
         if welcome_back:
             self.io.output(welcome_back)
 
+    def _run_game_loop(self):
+        """Main game interaction loop"""
+        while True:
+            try:
+                # Get user input with personalized prompt in green
+                user_input = self.io.input(f"\n{self.GREEN}{self.prompt_prefix}:{self.RESET} ").strip()
+                
+                if user_input.lower() in ['exit', 'quit', 'bye']:
+                    # Save progress before exiting
+                    self.saige.save_progress()
+                    self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
+                    break
+                    
+                if user_input.lower() == 'hint':
+                    hint = self.saige.get_next_hint()
+                    if hint:
+                        display_hint = f"\n💡  {hint}"
+                        self.saige.display_message(display_hint)
+                    continue
+
+                if user_input.lower() == 'help':
+                    self.io.output("\nAvailable commands:")
+                    self.io.output("- Type 'hint' if you need help with a challenge")
+                    self.io.output("- Type 'learn' if you think Saige's evaluation was incorrect")
+                    self.io.output("- Type 'clear' to reset the chat history")
+                    self.io.output("- Type 'skip' to skip the current challenge")
+                    self.io.output("- Type 'exit' to save your progress (based on your name and email) and quit")
+                    continue
+
+                if user_input.lower() == 'clear':
+                    self.chat_bot.clear_history()
+                    self.io.output("\n🧹 Chat history has been cleared. The AI will start fresh with the current challenge's system prompt.")
+                    continue
+
+                if user_input.lower() == 'skip':
+                    confirm = self.io.input(f"\n{self.GREEN}Are you sure you want to skip this challenge? (y/N):{self.RESET} ").strip().lower()
+                    if confirm == 'y':
+                        next_intro = self.saige.advance_challenge()
+                        self.saige.display_message(next_intro)
+                        self.saige.save_progress()  # Save progress after skipping
+                    else:
+                        self.io.output("\nChallenge skip cancelled.")
+                    continue
+
+                if user_input.lower() == 'learn':
+                    feedback = self.saige.save_learning_feedback()
+                    self.saige.display_message(feedback)
+                    continue
+
+                # Get response from chat bot
+                response = self.chat_bot.chat(user_input)
+
+                # Let Saige evaluate the interaction
+                success, feedback = self.saige.evaluate_interaction(user_input, response)
+                if feedback:
+                    if success:
+                        # If successful, advance to next challenge and show intro
+                        next_intro = self.saige.advance_challenge()
+                        self.saige.display_message(next_intro)
+
+                # Save progress after each successful interaction
+                if success:
+                    self.saige.save_progress()
+
+            except KeyboardInterrupt:
+                # Save progress before exiting
+                self.saige.save_progress()
+                self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
+                break
+            except Exception as e:
+                self.io.output(f"An error occurred: {e}")
+
     def run(self):
         """Main interaction loop"""
         self.io.output(f"\nWelcome to the AI Security Challenge!")
@@ -100,58 +191,8 @@ Yes, sometimes we'll ask you to trigger those security alerts - that's how we le
         intro = self.saige.introduce_current_state()
         self.saige.display_message(intro)
 
-        while True:
-            try:
-                # Get user input with personalized prompt in green
-                user_input = self.io.input(f"\n{self.GREEN}{self.prompt_prefix}:{self.RESET} ").strip()
-                
-                if user_input.lower() in ['exit', 'quit', 'bye']:
-                    # Save progress before exiting
-                    self.saige.save_progress()
-                    self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
-                    break
-                    
-                if user_input.lower() == 'hint':
-                    hint = self.saige.get_next_hint()
-                    if hint:
-                        display_hint = f"\n💡  {hint}"
-                        self.saige.display_message(display_hint)
-                    continue
-
-                if user_input.lower() == 'help':
-                    self.io.output("\nAvailable commands:")
-                    self.io.output("- Type 'hint' if you need help with a challenge")
-                    self.io.output("- Type 'learn' if you think Saige's evaluation was incorrect")
-                    self.io.output("- Type 'exit' to save your progress (based on your name and email) and quit")
-                    continue
-
-                if user_input.lower() == 'learn':
-                    feedback = self.saige.save_learning_feedback()
-                    self.saige.display_message(feedback)
-                    continue
-
-                # Get response from chat bot
-                response = self.chat_bot.chat(user_input)
-
-                # Let Saige evaluate the interaction
-                success, feedback = self.saige.evaluate_interaction(user_input, response)
-                if feedback:
-                    if success:
-                        # If successful, advance to next challenge and show intro
-                        next_intro = self.saige.advance_challenge()
-                        self.saige.display_message(next_intro)
-
-                # Save progress after each successful interaction
-                if success:
-                    self.saige.save_progress()
-
-            except KeyboardInterrupt:
-                # Save progress before exiting
-                self.saige.save_progress()
-                self.io.output("\nProgress saved! Goodbye! Thanks for learning about AI security!")
-                break
-            except Exception as e:
-                self.io.output(f"An error occurred: {e}")
+        # Start the main game loop
+        self._run_game_loop()
 
 def main():
     io_handler = IOHandler()
