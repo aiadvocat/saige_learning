@@ -144,7 +144,7 @@ class Straiker:
         self,
         api_key: str,
         user_name: str = "Straiker SDK",
-        base_url: str = "https://defend.dev.straiker.ai",
+        base_url: str = "https://argus.dev.straiker.ai",
         debug: bool = False
     ):
         self.api_key = api_key
