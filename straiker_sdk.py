@@ -128,11 +128,11 @@ class DetectionResult:
         return cls(
             turn_id=response_data.get('turn_id', ''),
             score=response_data.get('score', 0.0),
-            blocking_score=debug.get('blocking_score', 0.0),
-            monitoring_score=debug.get('monitoring_score', 0.0),
+            blocking_score=debug.get('score_blocking', 0.0),
+            monitoring_score=debug.get('score_detect', 0.0),
             detections={
-                'blocking': detections.get('blocking', {}),
-                'monitoring': detections.get('monitoring', {})
+                'blocking': detections.get('block', {}),
+                'monitoring': detections.get('detect', {})
             },
             disabled_checks=detections.get('disabled', [])
         )

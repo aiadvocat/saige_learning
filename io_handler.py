@@ -126,8 +126,8 @@ class WebIO(IOHandler):
         self.output(prompt, end="")
         
         try:
-            # Wait up to 200 seconds for input
-            result = self.input_queue.get(timeout=200)  # Use input_queue directly
+            # Wait up to 500 seconds for input
+            result = self.input_queue.get(timeout=500)  # Use input_queue directly
             return result
         except Empty:
             if is_init:

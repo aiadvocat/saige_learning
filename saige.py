@@ -341,6 +341,50 @@ You can get an API key from: https://straiker.ai/
             if 'system_prompt' in challenge:
                 self.chat_bot.set_system_prompt(challenge['system_prompt'])
                 
+            # Handle RAG setup for the challenge
+            if 'rag' in challenge and challenge['rag']:
+                rag_content = challenge['rag']
+                if rag_content.endswith('.txt'):
+                    try:
+                        self.chat_bot.enable_rag()  # Initialize RAG handler
+                        # Start loading animation first
+                        loading_message = "Loading knowledge base..."
+                        loading_flag, spinner_thread = self._show_inline_loading(loading_message)
+                        
+                        try:
+                            # Create a queue to get the result from the thread
+                            result_queue = queue.Queue()
+                            
+                            def load_rag():
+                                try:
+                                    self.chat_bot.rag.load_from_file(rag_content)
+                                    result_queue.put(("success", None))
+                                except Exception as e:
+                                    result_queue.put(("error", str(e)))
+                            
+                            # Start loading in a separate thread
+                            loading_thread = threading.Thread(target=load_rag)
+                            loading_thread.start()
+                            
+                            # Poll until loading is complete
+                            while loading_thread.is_alive():
+                                time.sleep(0.1)  # Short sleep to prevent CPU spinning
+                            
+                            # Get the result
+                            status, error = result_queue.get()
+                            if status == "error":
+                                raise Exception(f"RAG loading failed: {error}")
+                                
+                        finally:
+                            # Always stop the loading animation
+                            self._stop_loading(loading_flag, spinner_thread, len(loading_message))
+                            
+                    except Exception as e:
+                        print(f"Failed to load RAG file: {e}")
+                        self.chat_bot.disable_rag()  # Disable RAG if loading fails
+            else:
+                self.chat_bot.disable_rag()  # Disable RAG if not needed for this challenge
+                
             # Emit progress update for web interface
             if hasattr(self.io, 'socketio'):
                 self.io.socketio.emit('update_progress', {

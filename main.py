@@ -9,7 +9,7 @@ from web_app import app, socketio, init_app
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Start Saige AI Security Learning System')
-    parser.add_argument('--web', type=int, default=5000, help='Run in web mode with specific port (5000 default)')
+    parser.add_argument('--web', type=int, help='Run in web mode with specific port')
     parser.add_argument('--chapter', type=int, default=0, help='Starting chapter number')
     parser.add_argument('--challenge', type=int, default=0, help='Starting challenge number')
     args = parser.parse_args()
